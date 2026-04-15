@@ -9,6 +9,8 @@ overrides:
   '@ikary/cell-runtime-core': link:../ikary-manifest/libs/cell-runtime-core
   '@ikary/system-db-core': link:../ikary-manifest/libs/system-db-core
   '@ikary/system-log-core': link:../ikary-manifest/libs/system-log-core
+  '@ikary/system-migration-core': link:../ikary-manifest/libs/system-migration-core
+  '@ikary/cli': link:../ikary-manifest/apps/cli
 
 importers:
 
@@ -72,6 +74,12 @@ importers:
         specifier: ^3.0.0
         version: 3.25.76
     devDependencies:
+      '@ikary/cli':
+        specifier: link:../../../ikary-manifest/apps/cli
+        version: link:../../../ikary-manifest/apps/cli
+      '@ikary/system-migration-core':
+        specifier: link:../../../ikary-manifest/libs/system-migration-core
+        version: link:../../../ikary-manifest/libs/system-migration-core
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.39
