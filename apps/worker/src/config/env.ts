@@ -15,6 +15,8 @@ export const envSchema = z.object({
   RABBITMQ_EXCHANGE: z.string().default('cell.events'),
   RABBITMQ_DLX: z.string().default('cell.events.dlx'),
   PORT: z.coerce.number().int().positive().default(3002),
+  /** Enable pretty-printed logs (true for local dev, false for production JSON). */
+  LOG_PRETTY: z.coerce.boolean().default(false),
 });
 
 export type Env = z.infer<typeof envSchema>;

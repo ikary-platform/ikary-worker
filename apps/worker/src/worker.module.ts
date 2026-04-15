@@ -5,6 +5,7 @@ import { OutboxRepository } from '@ikary/cell-runtime-core';
 import type { CellRuntimeDatabase } from '@ikary/cell-runtime-core';
 import { SystemAmqpModule } from '@ikary/system-amqp/server';
 import { systemAmqpOptionsSchema } from '@ikary/system-amqp';
+import { SystemLogModule } from '@ikary/system-log-core/server';
 import { env } from './config/env.js';
 import { DatabaseModule } from './database.module.js';
 import { HealthModule } from './health/health.module.js';
@@ -12,6 +13,12 @@ import { RabbitMQAdapter } from './adapters/rabbitmq.adapter.js';
 import { BROKER_ADAPTER } from './adapters/broker-adapter.interface.js';
 import { OutboxProcessorService } from './outbox/outbox-processor.service.js';
 import { OutboxPollerService } from './outbox/outbox-poller.service.js';
+
+/**
+ * Alias token used to pass the shared DatabaseService to SystemLogModule
+ * without creating a second DB connection.
+ */
+const WORKER_LOG_DB = Symbol('WORKER_LOG_DB');
 
 export interface WorkerModuleOptions {
   /**
@@ -37,10 +44,13 @@ export interface WorkerModuleOptions {
  * Core worker module. Call WorkerModule.register() in your application's root
  * module — this is the entire public API surface for downstream consumers.
  *
- * When no brokerAdapter is provided, RabbitMQAdapter is used and
- * SystemAmqpModule is automatically imported (connection + lifecycle managed
- * by @ikary/system-amqp). If you supply a custom brokerAdapter, no AMQP
- * connection is established by this module.
+ * Logging: SystemLogModule (@ikary/system-log-core) is registered globally.
+ * Call `app.useLogger(app.get(LogService))` in main.ts to route all NestJS
+ * Logger calls through the platform logger (structured Pino, DB-backed sinks).
+ *
+ * Broker: When no brokerAdapter is provided, RabbitMQAdapter is used and
+ * SystemAmqpModule is automatically imported. Providing a custom brokerAdapter
+ * skips the AMQP connection entirely.
  *
  * @example — private app module
  * ```ts
@@ -91,8 +101,25 @@ export class WorkerModule {
 
     return {
       module: WorkerModule,
-      imports: [ScheduleModule.forRoot(), DatabaseModule, HealthModule, ...amqpImports],
+      imports: [
+        // Structured platform logging — globally available, routes NestJS Logger
+        // through Pino with DB-backed sinks and the system-log-core UI viewer.
+        // Note: log DB tables must exist (see migrations in @ikary/system-log-core).
+        SystemLogModule.register({
+          databaseProviderToken: WORKER_LOG_DB,
+          service:          'ikary-worker',
+          pretty:           env.LOG_PRETTY,
+          seedDefaultSink:  true,
+        }),
+        ScheduleModule.forRoot(),
+        DatabaseModule,
+        HealthModule,
+        ...amqpImports,
+      ],
       providers: [
+        // Alias so SystemLogModule can reuse the shared DB connection without
+        // opening a second pool. useExisting means zero overhead.
+        { provide: WORKER_LOG_DB, useExisting: DatabaseService },
         outboxRepositoryProvider,
         brokerAdapterProvider,
         ...(options.handlers ?? []),

@@ -29,7 +29,8 @@
     "overrides": {
       "@ikary/cell-contract":     "link:../ikary-manifest/libs/cell-contract",
       "@ikary/cell-runtime-core": "link:../ikary-manifest/libs/cell-runtime-core",
-      "@ikary/system-db-core":    "link:../ikary-manifest/libs/system-db-core"
+      "@ikary/system-db-core":    "link:../ikary-manifest/libs/system-db-core",
+      "@ikary/system-log-core":   "link:../ikary-manifest/libs/system-log-core"
     }
   }
 }
