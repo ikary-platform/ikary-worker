@@ -3,6 +3,9 @@ import { ScheduleModule } from '@nestjs/schedule';
 import { DatabaseService } from '@ikary/system-db-core';
 import { OutboxRepository } from '@ikary/cell-runtime-core';
 import type { CellRuntimeDatabase } from '@ikary/cell-runtime-core';
+import { SystemAmqpModule } from '@ikary/system-amqp/server';
+import { systemAmqpOptionsSchema } from '@ikary/system-amqp';
+import { env } from './config/env.js';
 import { DatabaseModule } from './database.module.js';
 import { HealthModule } from './health/health.module.js';
 import { RabbitMQAdapter } from './adapters/rabbitmq.adapter.js';
@@ -21,7 +24,8 @@ export interface WorkerModuleOptions {
    */
   handlers?: Provider[];
   /**
-   * Custom broker adapter provider. Omit to use the default RabbitMQAdapter.
+   * Custom broker adapter provider. Omit to use the default RabbitMQAdapter
+   * (backed by @ikary/system-amqp).
    *
    * @example
    * brokerAdapter: { provide: BROKER_ADAPTER, useClass: SqsAdapter }
@@ -32,6 +36,11 @@ export interface WorkerModuleOptions {
 /**
  * Core worker module. Call WorkerModule.register() in your application's root
  * module — this is the entire public API surface for downstream consumers.
+ *
+ * When no brokerAdapter is provided, RabbitMQAdapter is used and
+ * SystemAmqpModule is automatically imported (connection + lifecycle managed
+ * by @ikary/system-amqp). If you supply a custom brokerAdapter, no AMQP
+ * connection is established by this module.
  *
  * @example — private app module
  * ```ts
@@ -54,6 +63,8 @@ export interface WorkerModuleOptions {
 @Module({})
 export class WorkerModule {
   static register(options: WorkerModuleOptions = {}): DynamicModule {
+    const useDefaultBroker = !options.brokerAdapter;
+
     const brokerAdapterProvider: Provider = options.brokerAdapter ?? {
       provide: BROKER_ADAPTER,
       useClass: RabbitMQAdapter,
@@ -66,9 +77,21 @@ export class WorkerModule {
       inject: [DatabaseService],
     };
 
+    const amqpImports = useDefaultBroker
+      ? [
+          SystemAmqpModule.register(
+            systemAmqpOptionsSchema.parse({
+              url:      env.RABBITMQ_URL,
+              exchange: env.RABBITMQ_EXCHANGE,
+              dlx:      env.RABBITMQ_DLX,
+            }),
+          ),
+        ]
+      : [];
+
     return {
       module: WorkerModule,
-      imports: [ScheduleModule.forRoot(), DatabaseModule, HealthModule],
+      imports: [ScheduleModule.forRoot(), DatabaseModule, HealthModule, ...amqpImports],
       providers: [
         outboxRepositoryProvider,
         brokerAdapterProvider,

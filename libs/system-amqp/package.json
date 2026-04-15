@@ -1,0 +1,41 @@
+{
+  "name": "@ikary/system-amqp",
+  "version": "0.1.0",
+  "license": "MIT",
+  "microPackageKind": "mixed-shared-server",
+  "description": "System-level RabbitMQ/AMQP wrapper — connection lifecycle, publisher, and routing-key builder",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types":  "./src/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types":  "./src/server/index.ts",
+      "import": "./dist/server/index.js"
+    }
+  },
+  "scripts": {
+    "build":         "tsup src/index.ts src/server/index.ts --format esm --dts --clean",
+    "typecheck":     "tsc --noEmit",
+    "test":          "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "amqplib": "^0.10.4",
+    "zod":     "^3.0.0"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/common":  "^11.0.0",
+    "@types/amqplib":  "^0.10.5",
+    "@types/node":     "^20.0.0",
+    "tsup":            "^8.0.2",
+    "typescript":      "^5.5.3",
+    "vitest":          "^3.0.0"
+  },
+  "engines": { "node": ">=20" }
+}
