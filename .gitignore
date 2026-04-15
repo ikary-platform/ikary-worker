@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.turbo/
+
+# Coverage reports
+coverage/
+**/coverage/
+
+# Local env files
+.env
+.env.local
+.env.*.local

@@ -1,0 +1,35 @@
+{
+  "name": "ikary-worker",
+  "version": "0.1.0",
+  "private": true,
+  "description": "IKARY Worker — OSS transactional outbox poller and event dispatcher",
+  "license": "MIT",
+  "scripts": {
+    "build":        "turbo run build",
+    "typecheck":    "turbo run typecheck",
+    "test":         "vitest run --workspace vitest.workspace.ts",
+    "lint":         "turbo run lint",
+    "format":       "prettier --write .",
+    "format:check": "prettier --check .",
+    "changeset":    "changeset",
+    "version":      "changeset version",
+    "release":      "pnpm build && changeset publish"
+  },
+  "devDependencies": {
+    "@changesets/cli":    "^2.30.0",
+    "@vitest/coverage-v8": "^3.0.0",
+    "prettier":           "^3.3.0",
+    "turbo":              "^2.8.0",
+    "typescript":         "^5.5.3",
+    "vitest":             "^3.0.0"
+  },
+  "engines": { "node": ">=20" },
+  "packageManager": "pnpm@9.15.9",
+  "pnpm": {
+    "overrides": {
+      "@ikary/cell-contract":     "link:../ikary-manifest/libs/cell-contract",
+      "@ikary/cell-runtime-core": "link:../ikary-manifest/libs/cell-runtime-core",
+      "@ikary/system-db-core":    "link:../ikary-manifest/libs/system-db-core"
+    }
+  }
+}
