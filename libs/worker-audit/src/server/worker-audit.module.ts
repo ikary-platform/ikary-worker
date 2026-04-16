@@ -1,8 +1,13 @@
 import { Module, type DynamicModule, type Provider } from '@nestjs/common';
-import { workerAuditConfigSchema, type WorkerAuditConfig } from '../config/worker-audit.config.js';
+import {
+  workerAuditConfigSchema,
+  type WorkerAuditConfig,
+  type WorkerAuditConfigInput,
+} from '../config/worker-audit.config.js';
 import { AuditRepository } from './repositories/audit.repository.js';
 import { AuditService } from '../modules/audit/audit.service.js';
 import { AuditConsumer } from '../modules/audit/audit.consumer.js';
+import { AuditCleanupService } from '../modules/audit/audit-cleanup.service.js';
 import { WORKER_AUDIT_CONFIG, WORKER_AUDIT_DATABASE } from './worker-audit.tokens.js';
 
 /**
@@ -19,8 +24,8 @@ import { WORKER_AUDIT_CONFIG, WORKER_AUDIT_DATABASE } from './worker-audit.token
  */
 @Module({})
 export class WorkerAuditModule {
-  static register(input: WorkerAuditConfig): DynamicModule {
-    const config = workerAuditConfigSchema.parse(input);
+  static register(input: WorkerAuditConfigInput): DynamicModule {
+    const config: WorkerAuditConfig = workerAuditConfigSchema.parse(input);
 
     const providers: Provider[] = [
       { provide: WORKER_AUDIT_CONFIG, useValue: config },
@@ -32,6 +37,7 @@ export class WorkerAuditModule {
       AuditRepository,
       AuditService,
       AuditConsumer,
+      AuditCleanupService,
     ];
 
     return {
@@ -42,6 +48,7 @@ export class WorkerAuditModule {
         AuditRepository,
         AuditService,
         AuditConsumer,
+        AuditCleanupService,
         WORKER_AUDIT_CONFIG,
         WORKER_AUDIT_DATABASE,
       ],

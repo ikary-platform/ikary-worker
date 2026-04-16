@@ -17,6 +17,21 @@ export const workerAnalyticsConfigSchema = z.object({
    * package).
    */
   databaseProviderToken: providerTokenSchema,
+
+  /**
+   * Hourly buckets whose `bucket_start` is older than this many days are
+   * deleted by a daily cleanup job at 03:20 server time. Defaults to 90
+   * days — dashboards typically look back a quarter, and older buckets
+   * either get rolled up into coarser-grained tables or become
+   * statistical noise.
+   *
+   * Pass `null` to disable cleanup entirely — the cron still registers
+   * but every run exits immediately. Useful for tests, short-lived
+   * environments, or when an external job (e.g. a table partition
+   * pruner) owns retention.
+   */
+  retentionDays: z.number().int().positive().nullable().default(90),
 });
 
 export type WorkerAnalyticsConfig = z.infer<typeof workerAnalyticsConfigSchema>;
+export type WorkerAnalyticsConfigInput = z.input<typeof workerAnalyticsConfigSchema>;

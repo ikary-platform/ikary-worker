@@ -4,6 +4,7 @@ export {
   ACTIVITY_FEED_SUMMARY_MAX_LENGTH,
 } from '../modules/activity-feed/activity-feed.service.js';
 export { ActivityFeedConsumer } from '../modules/activity-feed/activity-feed.consumer.js';
+export { ActivityFeedCleanupService } from '../modules/activity-feed/activity-feed-cleanup.service.js';
 export { ActivityFeedRepository } from './repositories/activity-feed.repository.js';
 export {
   WORKER_ACTIVITY_FEED_DATABASE,
@@ -16,4 +17,5 @@ export type {
 export {
   workerActivityFeedConfigSchema,
   type WorkerActivityFeedConfig,
+  type WorkerActivityFeedConfigInput,
 } from '../config/worker-activity-feed.config.js';

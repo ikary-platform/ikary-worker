@@ -2,10 +2,12 @@ import { Module, type DynamicModule, type Provider } from '@nestjs/common';
 import {
   workerAnalyticsConfigSchema,
   type WorkerAnalyticsConfig,
+  type WorkerAnalyticsConfigInput,
 } from '../config/worker-analytics.config.js';
 import { AnalyticsRepository } from './repositories/analytics.repository.js';
 import { AnalyticsService } from '../modules/analytics/analytics.service.js';
 import { AnalyticsConsumer } from '../modules/analytics/analytics.consumer.js';
+import { AnalyticsCleanupService } from '../modules/analytics/analytics-cleanup.service.js';
 import { WORKER_ANALYTICS_CONFIG, WORKER_ANALYTICS_DATABASE } from './worker-analytics.tokens.js';
 
 /**
@@ -17,8 +19,8 @@ import { WORKER_ANALYTICS_CONFIG, WORKER_ANALYTICS_DATABASE } from './worker-ana
  */
 @Module({})
 export class WorkerAnalyticsModule {
-  static register(input: WorkerAnalyticsConfig): DynamicModule {
-    const config = workerAnalyticsConfigSchema.parse(input);
+  static register(input: WorkerAnalyticsConfigInput): DynamicModule {
+    const config: WorkerAnalyticsConfig = workerAnalyticsConfigSchema.parse(input);
 
     const providers: Provider[] = [
       { provide: WORKER_ANALYTICS_CONFIG, useValue: config },
@@ -30,6 +32,7 @@ export class WorkerAnalyticsModule {
       AnalyticsRepository,
       AnalyticsService,
       AnalyticsConsumer,
+      AnalyticsCleanupService,
     ];
 
     return {
@@ -40,6 +43,7 @@ export class WorkerAnalyticsModule {
         AnalyticsRepository,
         AnalyticsService,
         AnalyticsConsumer,
+        AnalyticsCleanupService,
         WORKER_ANALYTICS_CONFIG,
         WORKER_ANALYTICS_DATABASE,
       ],

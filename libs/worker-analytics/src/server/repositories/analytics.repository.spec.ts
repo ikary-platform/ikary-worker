@@ -31,11 +31,23 @@ function makeQueryBuilder() {
   return qb;
 }
 
+function makeDeleteQueryBuilder(numDeletedRows: number | bigint = 0) {
+  const qb: Record<string, ReturnType<typeof vi.fn>> = {};
+  qb['where']            = vi.fn().mockReturnValue(qb);
+  qb['executeTakeFirst'] = vi.fn().mockResolvedValue({ numDeletedRows });
+  return qb;
+}
+
 function makeDbService() {
   const qb = makeQueryBuilder();
+  const deleteQb = makeDeleteQueryBuilder(0);
   return {
     qb,
-    db: { insertInto: vi.fn().mockReturnValue(qb) },
+    deleteQb,
+    db: {
+      insertInto: vi.fn().mockReturnValue(qb),
+      deleteFrom: vi.fn().mockReturnValue(deleteQb),
+    },
   };
 }
 
@@ -86,5 +98,30 @@ describe('AnalyticsRepository', () => {
   it('registers an ON CONFLICT clause on the composite PK', async () => {
     await repo.upsertBucket(bucket);
     expect(db.qb.onConflict).toHaveBeenCalledOnce();
+  });
+
+  describe('deleteOlderThan', () => {
+    it('filters by bucket_start < ISO cutoff and returns the count', async () => {
+      db.deleteQb.executeTakeFirst.mockResolvedValue({ numDeletedRows: 12 });
+      const cutoff = new Date('2026-01-01T00:00:00.000Z');
+
+      const deleted = await repo.deleteOlderThan(cutoff);
+
+      expect(db.db.deleteFrom).toHaveBeenCalledWith('ikary_analytics_buckets_hourly');
+      expect(db.deleteQb.where).toHaveBeenCalledWith('bucket_start', '<', cutoff);
+      expect(deleted).toBe(12);
+    });
+
+    it('coerces a bigint numDeletedRows to number', async () => {
+      db.deleteQb.executeTakeFirst.mockResolvedValue({ numDeletedRows: 5000n });
+      const deleted = await repo.deleteOlderThan(new Date());
+      expect(deleted).toBe(5000);
+    });
+
+    it('returns 0 when numDeletedRows is missing', async () => {
+      db.deleteQb.executeTakeFirst.mockResolvedValue({});
+      const deleted = await repo.deleteOlderThan(new Date());
+      expect(deleted).toBe(0);
+    });
   });
 });

@@ -14,9 +14,24 @@ function makeQueryBuilder() {
   return qb;
 }
 
+function makeDeleteQueryBuilder(numDeletedRows: number | bigint = 0) {
+  const qb: Record<string, ReturnType<typeof vi.fn>> = {};
+  qb['where']            = vi.fn().mockReturnValue(qb);
+  qb['executeTakeFirst'] = vi.fn().mockResolvedValue({ numDeletedRows });
+  return qb;
+}
+
 function makeDbService() {
   const qb = makeQueryBuilder();
-  return { qb, db: { insertInto: vi.fn().mockReturnValue(qb) } };
+  const deleteQb = makeDeleteQueryBuilder(0);
+  return {
+    qb,
+    deleteQb,
+    db: {
+      insertInto: vi.fn().mockReturnValue(qb),
+      deleteFrom: vi.fn().mockReturnValue(deleteQb),
+    },
+  };
 }
 
 const entry: ActivityEntry = {
@@ -82,5 +97,30 @@ describe('ActivityFeedRepository', () => {
   it('uses ON CONFLICT DO NOTHING on event_id', async () => {
     await repo.insertIfNotExists(entry);
     expect(db.qb.onConflict).toHaveBeenCalledOnce();
+  });
+
+  describe('deleteOlderThan', () => {
+    it('filters by occurred_at < ISO cutoff and returns the count', async () => {
+      db.deleteQb.executeTakeFirst.mockResolvedValue({ numDeletedRows: 3 });
+      const cutoff = new Date('2026-03-01T00:00:00.000Z');
+
+      const deleted = await repo.deleteOlderThan(cutoff);
+
+      expect(db.db.deleteFrom).toHaveBeenCalledWith('ikary_activity_entries');
+      expect(db.deleteQb.where).toHaveBeenCalledWith('occurred_at', '<', cutoff);
+      expect(deleted).toBe(3);
+    });
+
+    it('coerces a bigint numDeletedRows to number', async () => {
+      db.deleteQb.executeTakeFirst.mockResolvedValue({ numDeletedRows: 1000n });
+      const deleted = await repo.deleteOlderThan(new Date());
+      expect(deleted).toBe(1000);
+    });
+
+    it('returns 0 when numDeletedRows is missing', async () => {
+      db.deleteQb.executeTakeFirst.mockResolvedValue({});
+      const deleted = await repo.deleteOlderThan(new Date());
+      expect(deleted).toBe(0);
+    });
   });
 });

@@ -2,10 +2,12 @@ import { Module, type DynamicModule, type Provider } from '@nestjs/common';
 import {
   workerActivityFeedConfigSchema,
   type WorkerActivityFeedConfig,
+  type WorkerActivityFeedConfigInput,
 } from '../config/worker-activity-feed.config.js';
 import { ActivityFeedRepository } from './repositories/activity-feed.repository.js';
 import { ActivityFeedService } from '../modules/activity-feed/activity-feed.service.js';
 import { ActivityFeedConsumer } from '../modules/activity-feed/activity-feed.consumer.js';
+import { ActivityFeedCleanupService } from '../modules/activity-feed/activity-feed-cleanup.service.js';
 import {
   WORKER_ACTIVITY_FEED_CONFIG,
   WORKER_ACTIVITY_FEED_DATABASE,
@@ -20,8 +22,8 @@ import {
  */
 @Module({})
 export class WorkerActivityFeedModule {
-  static register(input: WorkerActivityFeedConfig): DynamicModule {
-    const config = workerActivityFeedConfigSchema.parse(input);
+  static register(input: WorkerActivityFeedConfigInput): DynamicModule {
+    const config: WorkerActivityFeedConfig = workerActivityFeedConfigSchema.parse(input);
 
     const providers: Provider[] = [
       { provide: WORKER_ACTIVITY_FEED_CONFIG, useValue: config },
@@ -33,6 +35,7 @@ export class WorkerActivityFeedModule {
       ActivityFeedRepository,
       ActivityFeedService,
       ActivityFeedConsumer,
+      ActivityFeedCleanupService,
     ];
 
     return {
@@ -43,6 +46,7 @@ export class WorkerActivityFeedModule {
         ActivityFeedRepository,
         ActivityFeedService,
         ActivityFeedConsumer,
+        ActivityFeedCleanupService,
         WORKER_ACTIVITY_FEED_CONFIG,
         WORKER_ACTIVITY_FEED_DATABASE,
       ],

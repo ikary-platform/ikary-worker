@@ -3,6 +3,7 @@ import { WorkerAnalyticsModule } from './worker-analytics.module.js';
 import { AnalyticsRepository } from './repositories/analytics.repository.js';
 import { AnalyticsService } from '../modules/analytics/analytics.service.js';
 import { AnalyticsConsumer } from '../modules/analytics/analytics.consumer.js';
+import { AnalyticsCleanupService } from '../modules/analytics/analytics-cleanup.service.js';
 import { WORKER_ANALYTICS_CONFIG, WORKER_ANALYTICS_DATABASE } from './worker-analytics.tokens.js';
 
 const FAKE_DB_TOKEN = Symbol('FAKE_DB');
@@ -34,18 +35,39 @@ describe('WorkerAnalyticsModule.register', () => {
     expect(provider.useFactory(instance)).toBe(instance);
   });
 
-  it('registers and exports the repository, service, and consumer', () => {
+  it('registers and exports the repository, service, consumer, and cleanup service', () => {
     const mod = WorkerAnalyticsModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
     expect(mod.providers).toContain(AnalyticsRepository);
     expect(mod.providers).toContain(AnalyticsService);
     expect(mod.providers).toContain(AnalyticsConsumer);
+    expect(mod.providers).toContain(AnalyticsCleanupService);
     expect(mod.exports).toContain(AnalyticsRepository);
     expect(mod.exports).toContain(AnalyticsService);
     expect(mod.exports).toContain(AnalyticsConsumer);
+    expect(mod.exports).toContain(AnalyticsCleanupService);
   });
 
   it('is registered as a global module so ConsumerModule can inject AnalyticsService', () => {
     const mod = WorkerAnalyticsModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
     expect(mod.global).toBe(true);
+  });
+
+  it('applies the default retention of 90 days when retentionDays is omitted', () => {
+    const mod = WorkerAnalyticsModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
+    const cfg = (mod.providers ?? []).find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === WORKER_ANALYTICS_CONFIG,
+    );
+    expect((cfg as { useValue: { retentionDays: number } }).useValue.retentionDays).toBe(90);
+  });
+
+  it('accepts retentionDays: null to disable cleanup', () => {
+    const mod = WorkerAnalyticsModule.register({
+      databaseProviderToken: FAKE_DB_TOKEN,
+      retentionDays: null,
+    });
+    const cfg = (mod.providers ?? []).find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === WORKER_ANALYTICS_CONFIG,
+    );
+    expect((cfg as { useValue: { retentionDays: number | null } }).useValue.retentionDays).toBeNull();
   });
 });

@@ -2,6 +2,7 @@ import { Module, type DynamicModule, type Provider } from '@nestjs/common';
 import {
   consumerOptionsSchema,
   type ConsumerOptions,
+  type ConsumerOptionsInput,
 } from '../shared/consumer-options.schema.js';
 import {
   CONSUMER_DATABASE,
@@ -10,6 +11,7 @@ import {
 import { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
 import { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
 import { ConsumerRegistry } from './consumer.registry.js';
+import { ConsumerCleanupService } from './consumer-cleanup.service.js';
 
 export interface RegisterConsumerModuleOptions {
   /**
@@ -29,7 +31,7 @@ export interface RegisterConsumerModuleOptions {
   consumers?: Provider[];
 
   /** Optional overrides merged with the defaults in consumerOptionsSchema. */
-  options?: Partial<ConsumerOptions>;
+  options?: ConsumerOptionsInput;
 }
 
 /**
@@ -57,6 +59,7 @@ export class ConsumerModule {
       ConsumerReceiptsRepository,
       ConsumerOffsetsRepository,
       ConsumerRegistry,
+      ConsumerCleanupService,
       ...(input.consumers ?? []),
     ];
 
@@ -69,6 +72,7 @@ export class ConsumerModule {
         ConsumerReceiptsRepository,
         ConsumerOffsetsRepository,
         ConsumerRegistry,
+        ConsumerCleanupService,
       ],
     };
   }

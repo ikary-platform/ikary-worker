@@ -18,11 +18,12 @@ import type { ConsumerOffsetsRepository } from './consumer-offsets.repository.js
 // ── test fixtures ────────────────────────────────────────────────────────────
 
 const TEST_OPTIONS: ConsumerOptions = {
-  queuePrefix: 'ikary.',
-  exchange:    'cell.events',
-  prefetch:    32,
-  maxRetries:  5,
-  dlx:         'cell.events.dlx',
+  queuePrefix:          'ikary.',
+  exchange:             'cell.events',
+  prefetch:             32,
+  maxRetries:           5,
+  dlx:                  'cell.events.dlx',
+  receiptRetentionDays: 7,
 };
 
 const validEnvelope: DomainEventEnvelope = {

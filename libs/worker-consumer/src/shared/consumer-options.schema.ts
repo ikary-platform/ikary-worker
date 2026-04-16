@@ -32,6 +32,28 @@ export const consumerOptionsSchema = z.object({
    * `cell.events.dlx`).
    */
   dlx: z.string().default('cell.events.dlx'),
+
+  /**
+   * Receipts (in `ikary_event_consumer_receipts`) older than this many
+   * days are deleted by a daily cleanup job at 04:00 server time.
+   * Defaults to 7 days.
+   *
+   * This window MUST exceed the longest interval over which the broker
+   * could redeliver a message (typical RabbitMQ deployments: DLX
+   * republish-to-self bounded by `maxRetries` above, plus queue
+   * residency). 7 days is conservative for a `maxRetries: 5` default —
+   * override if you deploy a DLX with its own long retention window.
+   *
+   * Pass `null` to disable cleanup entirely. Useful for tests,
+   * short-lived environments, or when an external job (e.g. a table
+   * partition pruner) owns receipt retention.
+   *
+   * The offsets table (`ikary_event_consumer_offsets`) is intentionally
+   * NOT cleaned up: deleting a per-aggregate offset would break gap
+   * detection if the aggregate ever becomes active again.
+   */
+  receiptRetentionDays: z.number().int().positive().nullable().default(7),
 });
 
 export type ConsumerOptions = z.infer<typeof consumerOptionsSchema>;
+export type ConsumerOptionsInput = z.input<typeof consumerOptionsSchema>;

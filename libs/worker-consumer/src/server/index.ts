@@ -1,6 +1,7 @@
 // Server surface — NestJS providers, module, tokens, repositories.
 export { ConsumerModule, type RegisterConsumerModuleOptions } from './consumer.module.js';
 export { ConsumerRegistry } from './consumer.registry.js';
+export { ConsumerCleanupService } from './consumer-cleanup.service.js';
 export { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
 export { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
 export {
