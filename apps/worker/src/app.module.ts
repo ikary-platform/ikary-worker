@@ -10,15 +10,28 @@ import {
 import { WorkerModule } from './worker.module.js';
 
 /**
- * The OOTB consumers wired into this reference app. Extracted to named
- * constants so TypeScript's excess-property check on inline object literals
- * against NestJS's `Provider` union doesn't choke on the `multi` key (valid
- * at runtime, not in the union type).
+ * The OOTB consumers wired into this reference app. A single `useFactory`
+ * provider collects all three consumer classes (already instantiated and
+ * globally available via their own Worker*Module) into the array that
+ * `ConsumerRegistry` expects at `@Inject(CONSUMER)`.
+ *
+ * This shape (one non-multi factory) is used instead of three `multi: true`
+ * providers because NestJS collapses same-token `multi: true` providers
+ * across dynamic modules in surprising ways — three of them end up resolving
+ * to a single instance, leaving two consumers silently un-subscribed. The
+ * factory pattern sidesteps that entirely: one provider, one resolution,
+ * explicit array.
  */
 const CONSUMER_PROVIDERS = [
-  { provide: CONSUMER, useClass: AuditConsumer,        multi: true as const },
-  { provide: CONSUMER, useClass: AnalyticsConsumer,    multi: true as const },
-  { provide: CONSUMER, useClass: ActivityFeedConsumer, multi: true as const },
+  {
+    provide: CONSUMER,
+    useFactory: (
+      audit: AuditConsumer,
+      analytics: AnalyticsConsumer,
+      activity: ActivityFeedConsumer,
+    ) => [audit, analytics, activity],
+    inject: [AuditConsumer, AnalyticsConsumer, ActivityFeedConsumer],
+  },
 ];
 
 /**
@@ -46,9 +59,9 @@ const CONSUMER_PROVIDERS = [
     WorkerAnalyticsModule.register({     databaseProviderToken: DatabaseService }),
     WorkerActivityFeedModule.register({  databaseProviderToken: DatabaseService }),
 
-    // Register the broker consumers. Each one is a provider exported by its
-    // module. Multi: true is required for the framework's @Inject(CONSUMER)
-    // array-injection pattern.
+    // Register the broker consumers. The factory provider in
+    // CONSUMER_PROVIDERS bundles the three OOTB consumer classes into the
+    // IConsumer[] that ConsumerRegistry injects at @Inject(CONSUMER).
     ConsumerModule.register({
       databaseProviderToken: DatabaseService,
       consumers: CONSUMER_PROVIDERS,

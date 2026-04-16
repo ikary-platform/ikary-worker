@@ -8,6 +8,13 @@ import { AnalyticsService } from '../modules/analytics/analytics.service.js';
 import { AnalyticsConsumer } from '../modules/analytics/analytics.consumer.js';
 import { WORKER_ANALYTICS_CONFIG, WORKER_ANALYTICS_DATABASE } from './worker-analytics.tokens.js';
 
+/**
+ * Registered as a global module so the sibling `ConsumerModule` (which
+ * instantiates `AnalyticsConsumer` via its `CONSUMER` multi-provider token)
+ * can inject `AnalyticsService` without the app having to re-import this
+ * module everywhere. Matches the `@Global()` pattern used by the other
+ * OOTB projection modules.
+ */
 @Module({})
 export class WorkerAnalyticsModule {
   static register(input: WorkerAnalyticsConfig): DynamicModule {
@@ -27,6 +34,7 @@ export class WorkerAnalyticsModule {
 
     return {
       module: WorkerAnalyticsModule,
+      global: true,
       providers,
       exports: [
         AnalyticsRepository,

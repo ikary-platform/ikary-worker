@@ -7,6 +7,12 @@ import { AmqpPublisherService } from './amqp-publisher.service.js';
 /**
  * NestJS module that wires AMQP connection and publisher services.
  *
+ * Registered as a global module so sibling modules (e.g. a worker's
+ * `ConsumerModule`) can inject `AmqpConnectionService` without having to
+ * re-import `SystemAmqpModule` themselves. This matches the convention
+ * already used by other infra modules (`DatabaseModule`, `SystemLogModule`):
+ * one registration per app at bootstrap, shared everywhere.
+ *
  * @example
  * SystemAmqpModule.register({
  *   url:      env.RABBITMQ_URL,
@@ -19,6 +25,7 @@ export class SystemAmqpModule {
   static register(options: SystemAmqpOptions): DynamicModule {
     return {
       module: SystemAmqpModule,
+      global: true,
       providers: [
         { provide: SYSTEM_AMQP_OPTIONS, useValue: options },
         AmqpConnectionService,
