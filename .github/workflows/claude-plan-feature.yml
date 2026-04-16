@@ -1,0 +1,104 @@
+name: Claude Plan Feature
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+  id-token: write
+
+concurrency:
+  group: claude-plan-feature-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  plan-feature:
+    runs-on: ubuntu-latest
+
+    if: |
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '@claude plan feature') &&
+      !github.event.issue.pull_request &&
+      contains(vars.CLAUDE_ALLOWED_USERS, github.event.comment.user.login)
+
+    steps:
+      - name: Acknowledge trigger
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: "true"
+          use_sticky_comment: "true"
+          show_full_output: true
+          claude_args: >
+            --model claude-opus-4-6
+            --max-turns 20
+          prompt: |
+            Plan the feature described in this issue. Follow all rules in CLAUDE.md.
+
+            IKARY convention files you should consult:
+            - LIBRARY_STYLE_RULES.md — microPackageKind, folder layout, system-*/worker-* naming, Zod, Kysely, export surface
+            - LIBRARY_TEMPLATE.md — folder blueprint, export conventions, vitest config template
+            - CLAUDE.md — top-level project rules (DI, testing, Zod contracts)
+
+            Explore the codebase to understand existing patterns before planning.
+
+            Use this exact output format:
+
+            ## Feature Plan
+
+            ### Goal
+            One sentence: what this feature achieves and for whom.
+
+            ### User Story
+            As a [user type], I want to [action] so that [outcome].
+
+            ### Acceptance Criteria
+            Numbered list of specific, testable conditions that define "done".
+
+            ### Proposed Implementation
+            Numbered step-by-step build plan. For each step: which file/module/service, what to build, and why. Reference IKARY conventions for each new file or module.
+
+            ### IKARY Convention Checklist
+            - [ ] Zod schemas defined for all boundary types
+            - [ ] microPackageKind declared in package.json (if new library)
+            - [ ] system-* or worker-* naming prefix chosen correctly (if new library)
+            - [ ] src/shared/ used for browser-safe contracts (not src/contracts/)
+            - [ ] src/server/ used for Node/NestJS runtime code in mixed packages
+            - [ ] @ikary/* name added to .changeset/config.json fixed array (if new library)
+            - [ ] DB access via @ikary/system-db-core Kysely repositories (if applicable)
+            - [ ] @swc/core added to devDependencies if the package uses NestJS decorators
+            - [ ] No `import type` for classes used as constructor-injected dependencies
+
+            ### Design Decisions and Trade-offs
+            Key choices to make before starting. Flag alternatives considered.
+
+            ### Dependencies
+            Other features, services, or PRs this depends on or could conflict with.
+
+            ### Out of Scope
+            What this feature explicitly does NOT cover.
+
+            ### Estimated Effort
+            XS / S / M / L / XL with one sentence justification.
+
+            Rules:
+            - Do NOT write any code. Only produce the plan.
+            - Be concise and direct. No filler sentences. No emojis.

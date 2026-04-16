@@ -1,0 +1,71 @@
+name: Claude Revise Plan
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+  id-token: write
+
+concurrency:
+  group: claude-revise-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  revise-plan:
+    runs-on: ubuntu-latest
+
+    if: |
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '@claude revise') &&
+      !github.event.issue.pull_request &&
+      contains(vars.CLAUDE_ALLOWED_USERS, github.event.comment.user.login)
+
+    steps:
+      - name: Acknowledge trigger
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: "true"
+          use_sticky_comment: "true"
+          show_full_output: true
+          claude_args: >
+            --model claude-opus-4-6
+            --max-turns 20
+          prompt: |
+            Revise the existing plan based on the feedback in this comment. Follow all rules in CLAUDE.md.
+
+            IKARY convention files you should consult:
+            - LIBRARY_STYLE_RULES.md — microPackageKind, folder layout, system-*/worker-* naming, Zod, Kysely, export surface
+            - LIBRARY_TEMPLATE.md — folder blueprint, export conventions, vitest config template
+            - CLAUDE.md — top-level project rules (DI, testing, Zod contracts)
+
+            1. Find the existing plan in the issue comments (look for "## Feature Plan" or "## Fix Plan").
+            2. Incorporate the feedback from the triggering comment.
+            3. Produce a revised plan in the same format as the original.
+            4. Add a "### Revisions" section at the top noting what changed and why.
+            5. If the feedback contradicts IKARY conventions, follow the conventions and explain why.
+            6. If no existing plan is found, ask the user to first run @claude plan feature or @claude plan fix.
+
+            Rules:
+            - Do NOT write any code. Only produce the revised plan.
+            - Be concise and direct. No filler sentences. No emojis.
+            - Preserve all sections from the original plan, updating only what the feedback requires.

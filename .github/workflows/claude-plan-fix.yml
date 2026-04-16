@@ -1,0 +1,98 @@
+name: Claude Plan Fix
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+  id-token: write
+
+concurrency:
+  group: claude-plan-fix-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  plan-fix:
+    runs-on: ubuntu-latest
+
+    if: |
+      github.event_name == 'issue_comment' &&
+      contains(github.event.comment.body, '@claude plan fix') &&
+      !github.event.issue.pull_request &&
+      contains(vars.CLAUDE_ALLOWED_USERS, github.event.comment.user.login)
+
+    steps:
+      - name: Acknowledge trigger
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.reactions.createForIssueComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: context.payload.comment.id,
+              content: 'eyes'
+            });
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          track_progress: "true"
+          use_sticky_comment: "true"
+          show_full_output: true
+          claude_args: >
+            --model claude-opus-4-6
+            --max-turns 20
+          prompt: |
+            Plan a fix for the bug described in this issue. Follow all rules in CLAUDE.md.
+
+            IKARY convention files you should consult:
+            - LIBRARY_STYLE_RULES.md — microPackageKind, folder layout, system-*/worker-* naming, Zod, Kysely, export surface
+            - LIBRARY_TEMPLATE.md — folder blueprint, export conventions, vitest config template
+            - CLAUDE.md — top-level project rules (DI, testing, Zod contracts)
+
+            Explore the codebase to investigate the root cause before planning.
+
+            Use this exact output format:
+
+            ## Fix Plan
+
+            ### Problem Summary
+            Brief restatement of the bug. One or two sentences max.
+
+            ### Root Cause Analysis
+            What causes this. Reference actual file paths and function names from the codebase.
+
+            ### Proposed Fix
+            Numbered step-by-step implementation plan. For each step: which file/module, what change, and why.
+
+            ### IKARY Convention Checklist
+            - [ ] Changes maintain Zod-first contract pattern
+            - [ ] No inline SQL introduced in runtime code
+            - [ ] Folder naming follows src/shared/, src/server/ convention
+            - [ ] Any new types crossing boundaries have Zod schemas
+            - [ ] No `import type` for classes used as constructor-injected NestJS dependencies
+
+            ### Affected Areas
+            Files, modules, services, or APIs touched by this fix.
+
+            ### Regression Risks
+            What existing behavior could break. What tests should be added or updated.
+
+            ### Edge Cases
+            Specific scenarios to validate before closing the issue.
+
+            ### Estimated Effort
+            XS / S / M / L / XL with one sentence justification.
+
+            Rules:
+            - Do NOT write any code. Only produce the plan.
+            - Be concise and direct. No filler sentences. No emojis.
+            - If the issue lacks enough detail, ask a specific follow-up question.
