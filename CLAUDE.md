@@ -63,3 +63,47 @@ export interface AmqpOptions { url: string; }
   class reference in `Reflect.metadata`, leading to undefined injection.
 - Use `@Global()` sparingly — only for modules that are genuinely app-wide
   (e.g. `DatabaseModule`).
+
+### Thin-consumer pattern
+
+Every broker consumer in this repo follows the same shape:
+
+- **Consumer class** — `handle(event, tx) { await this.service.method(event, tx); }`.
+  One line. No business logic. Imports only the service.
+- **Service class** — owns the envelope-to-row mapping, classification, any
+  derivation logic. Returns / passes value objects that are Zod-validated.
+- **Repository class** — owns all Kysely queries. No inline SQL anywhere else.
+  Accepts an optional transaction client so it can ride on the framework's
+  receipt + offset transaction.
+- **Module** — `FooModule.register({ databaseProviderToken })` provides the
+  repository, service, and consumer and exports them. Registering the consumer
+  in `ConsumerModule.register({ consumers })` is done at the app level so the
+  active consumer set is auditable by reading one file.
+- **Cross-aggregate sinks set `ordered: false`** on the IConsumer. Per-aggregate
+  projections leave it default (true) so the framework enforces ordering.
+
+See `libs/worker-audit/` for the reference implementation.
+
+### Folder layout for new libs
+
+Follow `LIBRARY_TEMPLATE.md`:
+
+```
+src/
+  config/<lib>.config.ts          # Zod config schema
+  shared/<entry>.schema.ts        # Zod cross-boundary schemas
+  shared/index.ts
+  server/
+    db/schema.ts                  # Kysely table types
+    repositories/<domain>.repository.ts
+    <lib>.module.ts
+    <lib>.tokens.ts
+    index.ts
+  modules/<domain>/
+    <domain>.service.ts
+    <domain>.consumer.ts
+  index.ts                        # shared surface exports
+```
+
+The older flat `src/server/` layout in `worker-consumer` predates this
+convention — new libs use the structure above.

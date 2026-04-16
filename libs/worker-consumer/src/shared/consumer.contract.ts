@@ -50,6 +50,27 @@ export interface IConsumer {
   readonly eventTypes: string | string[];
 
   /**
+   * Opt out of per-aggregate gap detection (default: true).
+   *
+   * When `true` (the default), the runner enforces strict per-aggregate
+   * version ordering via `ikary_event_consumer_offsets`. Out-of-order
+   * deliveries are republished-with-retry until the missing version arrives
+   * or the max-retry cap is hit. This is correct for per-aggregate projections
+   * where event order matters (e.g. rebuilding the state of one entity).
+   *
+   * When `false`, the runner skips gap detection AND offset tracking. The
+   * handler runs on every delivery regardless of version ordering, and no
+   * row is written to `ikary_event_consumer_offsets`. This is the correct
+   * setting for cross-aggregate sinks — audit archives, hourly-bucket
+   * aggregators, activity feeds — where order has no semantic meaning and
+   * gap detection would incorrectly DLX valid events.
+   *
+   * Receipts (idempotency via `ikary_event_consumer_receipts`) remain
+   * unconditional regardless of this flag.
+   */
+  readonly ordered?: boolean;
+
+  /**
    * Called inside a Kysely transaction. The framework inserts the idempotency
    * receipt and advances the offset in the SAME transaction, so handler DB
    * side-effects are either fully persisted alongside the receipt or rolled

@@ -298,6 +298,48 @@ describe('ConsumerRunner.process', () => {
     expect(offsets.upsert).toHaveBeenCalledWith('audit', 'tenant-1', 'invoice:inv-001', 1, expect.anything());
   });
 
+  // ── unordered consumers (ordered: false) ─────────────────────────────────
+
+  describe('ordered: false (cross-aggregate sinks)', () => {
+    const unorderedConsumer: IConsumer = {
+      name: 'archive',
+      eventTypes: '#',
+      ordered: false,
+      handle: vi.fn(),
+    };
+
+    let unorderedRunner: ConsumerRunner;
+
+    beforeEach(() => {
+      unorderedRunner = new ConsumerRunner(unorderedConsumer, TEST_OPTIONS, receipts, offsets, tx);
+    });
+
+    it('skips gap detection when ordered is false — runs handler on a version gap', async () => {
+      // Offset says last was v3; incoming is v5 (v4 missing).
+      // A default (ordered) consumer would republish. Unordered one proceeds.
+      offsets.getLastVersion.mockResolvedValue(3);
+
+      await unorderedRunner.process(channel, fakeMessage({ envelope: { ...validEnvelope, version: 5 } }));
+
+      expect(unorderedConsumer.handle).toHaveBeenCalledOnce();
+      expect(channel.ack).toHaveBeenCalledOnce();
+      expect(channel.publish).not.toHaveBeenCalled();
+    });
+
+    it('does not call offsets.getLastVersion when ordered is false', async () => {
+      await unorderedRunner.process(channel, fakeMessage());
+      expect(offsets.getLastVersion).not.toHaveBeenCalled();
+    });
+
+    it('does not call offsets.upsert inside the transaction when ordered is false', async () => {
+      await unorderedRunner.process(channel, fakeMessage());
+      expect(offsets.upsert).not.toHaveBeenCalled();
+      // Receipt insert still happens — idempotency applies to every consumer.
+      expect(receipts.insert).toHaveBeenCalledOnce();
+      expect(channel.ack).toHaveBeenCalledOnce();
+    });
+  });
+
   // ── handler errors ──────────────────────────────────────────────────────
 
   it('republishes with retry++ when the handler throws', async () => {

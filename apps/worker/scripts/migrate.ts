@@ -38,9 +38,12 @@ import { MigrationRunner } from '@ikary/system-migration-core';
  * Must match the list in ikary-manifest/apps/cli/src/commands/local-db.ts.
  */
 const MIGRATION_PACKAGES = [
-  '@ikary/cell-runtime-core',  // outbox + audit tables (owned by ikary-manifest)
-  '@ikary/system-log-core',     // log settings, sinks, entries (worker requirement)
-  '@ikary/worker-consumer',     // consumer receipts + offsets (worker requirement)
+  '@ikary/cell-runtime-core',    // outbox + audit tables (owned by ikary-manifest)
+  '@ikary/system-log-core',      // log settings, sinks, entries (worker requirement)
+  '@ikary/worker-consumer',      // consumer receipts + offsets (worker requirement)
+  '@ikary/worker-audit',         // ikary_audit_entries         (OOTB projection)
+  '@ikary/worker-analytics',     // ikary_analytics_buckets_hourly (OOTB projection)
+  '@ikary/worker-activity-feed', // ikary_activity_entries      (OOTB projection)
 ] as const;
 
 // ── arg parsing ──────────────────────────────────────────────────────────────

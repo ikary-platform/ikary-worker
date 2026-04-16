@@ -1,0 +1,49 @@
+{
+  "name": "@ikary/worker-analytics",
+  "version": "0.1.0",
+  "license": "MIT",
+  "microPackageKind": "mixed-shared-server",
+  "description": "OOTB analytics consumer for ikary-worker — classifies events and aggregates them into hourly buckets.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": {
+      "types":  "./src/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./server": {
+      "types":  "./src/server/index.ts",
+      "import": "./dist/server/index.js"
+    }
+  },
+  "scripts": {
+    "build":         "tsup src/index.ts src/server/index.ts --format esm --dts --clean",
+    "typecheck":     "tsc --noEmit",
+    "test":          "vitest run",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "@ikary/cell-contract":     "^0.3.0",
+    "@ikary/system-db-core":    "^0.3.0",
+    "@ikary/worker-consumer":   "workspace:*",
+    "zod":                      "^3.0.0"
+  },
+  "peerDependencies": {
+    "@nestjs/common": "^11.0.0"
+  },
+  "devDependencies": {
+    "@nestjs/common":  "^11.0.0",
+    "@swc/core":       "^1.15.26",
+    "@types/node":     "^20.0.0",
+    "tsup":            "^8.0.2",
+    "typescript":      "^5.5.3",
+    "vitest":          "^3.0.0"
+  },
+  "engines": { "node": ">=20" },
+  "files": [
+    "dist",
+    "src",
+    "migrations",
+    "README.md"
+  ]
+}

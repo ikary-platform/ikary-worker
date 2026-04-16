@@ -52,6 +52,18 @@ importers:
       '@ikary/system-log-core':
         specifier: link:../../../ikary-manifest/libs/system-log-core
         version: link:../../../ikary-manifest/libs/system-log-core
+      '@ikary/worker-activity-feed':
+        specifier: workspace:*
+        version: link:../../libs/worker-activity-feed
+      '@ikary/worker-analytics':
+        specifier: workspace:*
+        version: link:../../libs/worker-analytics
+      '@ikary/worker-audit':
+        specifier: workspace:*
+        version: link:../../libs/worker-audit
+      '@ikary/worker-consumer':
+        specifier: workspace:*
+        version: link:../../libs/worker-consumer
       '@nestjs/common':
         specifier: ^11.0.0
         version: 11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2)
@@ -120,6 +132,108 @@ importers:
       '@types/amqplib':
         specifier: ^0.10.5
         version: 0.10.8
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.39
+      tsup:
+        specifier: ^8.0.2
+        version: 8.5.1(@swc/core@1.15.26)(postcss@8.5.9)(tsx@4.21.0)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.5.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.39)(tsx@4.21.0)
+
+  libs/worker-activity-feed:
+    dependencies:
+      '@ikary/cell-contract':
+        specifier: link:../../../ikary-manifest/libs/cell-contract
+        version: link:../../../ikary-manifest/libs/cell-contract
+      '@ikary/system-db-core':
+        specifier: link:../../../ikary-manifest/libs/system-db-core
+        version: link:../../../ikary-manifest/libs/system-db-core
+      '@ikary/worker-consumer':
+        specifier: workspace:*
+        version: link:../worker-consumer
+      zod:
+        specifier: ^3.0.0
+        version: 3.25.76
+    devDependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@swc/core':
+        specifier: ^1.15.26
+        version: 1.15.26
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.39
+      tsup:
+        specifier: ^8.0.2
+        version: 8.5.1(@swc/core@1.15.26)(postcss@8.5.9)(tsx@4.21.0)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.5.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.39)(tsx@4.21.0)
+
+  libs/worker-analytics:
+    dependencies:
+      '@ikary/cell-contract':
+        specifier: link:../../../ikary-manifest/libs/cell-contract
+        version: link:../../../ikary-manifest/libs/cell-contract
+      '@ikary/system-db-core':
+        specifier: link:../../../ikary-manifest/libs/system-db-core
+        version: link:../../../ikary-manifest/libs/system-db-core
+      '@ikary/worker-consumer':
+        specifier: workspace:*
+        version: link:../worker-consumer
+      zod:
+        specifier: ^3.0.0
+        version: 3.25.76
+    devDependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@swc/core':
+        specifier: ^1.15.26
+        version: 1.15.26
+      '@types/node':
+        specifier: ^20.0.0
+        version: 20.19.39
+      tsup:
+        specifier: ^8.0.2
+        version: 8.5.1(@swc/core@1.15.26)(postcss@8.5.9)(tsx@4.21.0)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.5.3
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@20.19.39)(tsx@4.21.0)
+
+  libs/worker-audit:
+    dependencies:
+      '@ikary/cell-contract':
+        specifier: link:../../../ikary-manifest/libs/cell-contract
+        version: link:../../../ikary-manifest/libs/cell-contract
+      '@ikary/system-db-core':
+        specifier: link:../../../ikary-manifest/libs/system-db-core
+        version: link:../../../ikary-manifest/libs/system-db-core
+      '@ikary/worker-consumer':
+        specifier: workspace:*
+        version: link:../worker-consumer
+      zod:
+        specifier: ^3.0.0
+        version: 3.25.76
+    devDependencies:
+      '@nestjs/common':
+        specifier: ^11.0.0
+        version: 11.1.19(reflect-metadata@0.2.2)(rxjs@7.8.2)
+      '@swc/core':
+        specifier: ^1.15.26
+        version: 1.15.26
       '@types/node':
         specifier: ^20.0.0
         version: 20.19.39
