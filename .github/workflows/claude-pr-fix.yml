@@ -1,0 +1,102 @@
+name: Claude PR Fix Loop
+
+on:
+  pull_request_review_comment:
+    types: [created]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: write
+  pull-requests: write
+  id-token: write
+
+concurrency:
+  group: claude-pr-fix-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  fix-from-review:
+    runs-on: ubuntu-latest
+
+    if: |
+      (
+        (github.event_name == 'pull_request_review_comment' && contains(github.event.comment.body, '@claude')) ||
+        (github.event_name == 'issue_comment' && github.event.issue.pull_request && contains(github.event.comment.body, '@claude'))
+      ) &&
+      contains(vars.CLAUDE_ALLOWED_USERS, github.event.comment.user.login)
+
+    steps:
+      - name: Acknowledge trigger
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const commentId = context.payload.comment.id;
+            const endpoint = context.eventName === 'pull_request_review_comment'
+              ? github.rest.reactions.createForPullRequestReviewComment
+              : github.rest.reactions.createForIssueComment;
+            await endpoint({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: commentId,
+              content: 'eyes'
+            });
+
+      - name: Checkout ikary-worker
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.ref || '' }}
+          path: ikary-worker
+
+      - name: Checkout ikary-manifest (linked packages)
+        uses: actions/checkout@v4
+        with:
+          repository: ikary-platform/ikary-manifest
+          path: ikary-manifest
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ikary-worker/.nvmrc
+          cache: pnpm
+          cache-dependency-path: ikary-worker/pnpm-lock.yaml
+
+      - name: Install manifest dependencies
+        working-directory: ikary-manifest
+        run: pnpm install --frozen-lockfile
+
+      - name: Install worker dependencies
+        working-directory: ikary-worker
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          show_full_output: true
+          working_directory: ikary-worker
+          claude_args: >
+            --model claude-sonnet-4-6
+            --max-turns 50
+            --dangerously-skip-permissions
+          prompt: |
+            Fix the code based on the review comment. Follow all rules in CLAUDE.md.
+
+            IKARY convention files you should consult:
+            - LIBRARY_STYLE_RULES.md — microPackageKind, folder layout, system-*/worker-* naming, Zod, Kysely, export surface
+            - LIBRARY_TEMPLATE.md — folder blueprint, export conventions, vitest config template
+            - CLAUDE.md — top-level project rules (DI, testing, Zod contracts)
+
+            1. Read the review comment that triggered this run.
+            2. Fix the issue described in the comment.
+            3. Run pnpm run build, pnpm run typecheck, and pnpm run test before pushing.
+            4. Reply to the review comment explaining what you changed.
+
+            Rules:
+            - Only fix what the review comment asks for. Do not refactor unrelated code.
+            - If the requested change contradicts IKARY conventions, explain why and propose an alternative.

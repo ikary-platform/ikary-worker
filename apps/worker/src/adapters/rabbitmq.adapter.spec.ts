@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { DomainEventEnvelope } from '@ikary/cell-contract';
 import { RabbitMQAdapter } from './rabbitmq.adapter.js';
+import type { AmqpPublisherService } from '@ikary/system-amqp/server';
 
 vi.mock('../config/env.js', () => ({
   env: {
-    DATABASE_URL:           'postgres://test:test@localhost:5432/test',
+    DATABASE_URL:            'postgres://test',
     OUTBOX_POLL_INTERVAL_MS: 2000,
     OUTBOX_BATCH_SIZE:       10,
     OUTBOX_MAX_RETRIES:      3,
@@ -12,25 +13,6 @@ vi.mock('../config/env.js', () => ({
     RABBITMQ_EXCHANGE:       'cell.events',
     RABBITMQ_DLX:            'cell.events.dlx',
     PORT:                    3002,
-  },
-}));
-
-const { mockChannel, mockConnection } = vi.hoisted(() => {
-  const mockChannel = {
-    assertExchange: vi.fn().mockResolvedValue({}),
-    publish:        vi.fn().mockReturnValue(true),
-    close:          vi.fn().mockResolvedValue(undefined),
-  };
-  const mockConnection = {
-    createChannel: vi.fn().mockResolvedValue(mockChannel),
-    close:         vi.fn().mockResolvedValue(undefined),
-  };
-  return { mockChannel, mockConnection };
-});
-
-vi.mock('amqplib', () => ({
-  default: {
-    connect: vi.fn().mockResolvedValue(mockConnection),
   },
 }));
 
@@ -50,93 +32,73 @@ const testEvent: DomainEventEnvelope = {
 };
 
 describe('RabbitMQAdapter', () => {
+  let mockPublisher: Pick<AmqpPublisherService, 'publishToExchange' | 'publishToDlx'>;
   let adapter: RabbitMQAdapter;
 
-  beforeEach(async () => {
-    vi.clearAllMocks();
-    // Re-apply default return values after clearAllMocks
-    mockChannel.assertExchange.mockResolvedValue({});
-    mockChannel.publish.mockReturnValue(true);
-    mockChannel.close.mockResolvedValue(undefined);
-    mockConnection.createChannel.mockResolvedValue(mockChannel);
-    mockConnection.close.mockResolvedValue(undefined);
-
-    adapter = new RabbitMQAdapter();
-    await adapter.onModuleInit();
+  beforeEach(() => {
+    mockPublisher = {
+      publishToExchange: vi.fn(),
+      publishToDlx:      vi.fn(),
+    };
+    adapter = new RabbitMQAdapter(mockPublisher as AmqpPublisherService);
   });
 
-  it('declares the topic exchange on init', () => {
-    expect(mockChannel.assertExchange).toHaveBeenCalledWith(
-      'cell.events', 'topic', { durable: true },
-    );
+  describe('publish', () => {
+    it('builds a hierarchical routing key from event scope fields', async () => {
+      await adapter.publish(testEvent);
+
+      const [routingKey] = (mockPublisher.publishToExchange as ReturnType<typeof vi.fn>).mock.calls[0] as [string, Buffer, object];
+      // cell scope: cell.{tenantId}.{workspaceId}.{cellId}.{event_name}
+      expect(routingKey).toBe('cell.tenant-1.workspace-1.cell-1.invoice.created');
+    });
+
+    it('passes the serialised event as the message body', async () => {
+      await adapter.publish(testEvent);
+
+      const [, body] = (mockPublisher.publishToExchange as ReturnType<typeof vi.fn>).mock.calls[0] as [string, Buffer, object];
+      expect(JSON.parse(body.toString())).toMatchObject({ event_id: 'evt-001' });
+    });
+
+    it('sets persistent delivery and content type', async () => {
+      await adapter.publish(testEvent);
+
+      const [, , opts] = (mockPublisher.publishToExchange as ReturnType<typeof vi.fn>).mock.calls[0] as [string, Buffer, Record<string, unknown>];
+      expect(opts['persistent']).toBe(true);
+      expect(opts['contentType']).toBe('application/json');
+    });
+
+    it('includes all required AMQP headers', async () => {
+      await adapter.publish(testEvent);
+
+      const [, , opts] = (mockPublisher.publishToExchange as ReturnType<typeof vi.fn>).mock.calls[0] as [string, Buffer, Record<string, unknown>];
+      const headers = opts['headers'] as Record<string, unknown>;
+      expect(headers['x-event-id']).toBe('evt-001');
+      expect(headers['x-event-version']).toBe(1);
+      expect(headers['x-tenant-id']).toBe('tenant-1');
+      expect(headers['x-workspace-id']).toBe('workspace-1');
+      expect(headers['x-cell-id']).toBe('cell-1');
+    });
   });
 
-  it('declares the dead-letter (fanout) exchange on init', () => {
-    expect(mockChannel.assertExchange).toHaveBeenCalledWith(
-      'cell.events.dlx', 'fanout', { durable: true },
-    );
-  });
+  describe('publishToDlx', () => {
+    it('delegates to publisher.publishToDlx', async () => {
+      await adapter.publishToDlx(testEvent, 'max retries exceeded');
+      expect(mockPublisher.publishToDlx).toHaveBeenCalledOnce();
+    });
 
-  it('publishes to the topic exchange with event_name as routing key', async () => {
-    await adapter.publish(testEvent);
+    it('embeds the failure reason in the message body', async () => {
+      await adapter.publishToDlx(testEvent, 'max retries exceeded');
 
-    expect(mockChannel.publish).toHaveBeenCalledWith(
-      'cell.events',
-      'invoice.created',
-      expect.any(Buffer),
-      expect.objectContaining({ persistent: true, contentType: 'application/json' }),
-    );
-  });
+      const [body] = (mockPublisher.publishToDlx as ReturnType<typeof vi.fn>).mock.calls[0] as [Buffer];
+      const msg = JSON.parse(body.toString()) as { failure_reason: string };
+      expect(msg.failure_reason).toBe('max retries exceeded');
+    });
 
-  it('includes all required headers when publishing', async () => {
-    await adapter.publish(testEvent);
+    it('uses persistent delivery for DLX messages', async () => {
+      await adapter.publishToDlx(testEvent, 'reason');
 
-    const [, , , opts] = mockChannel.publish.mock.calls[0] as [string, string, Buffer, Record<string, unknown>];
-    expect((opts['headers'] as Record<string, unknown>)['x-event-id']).toBe('evt-001');
-    expect((opts['headers'] as Record<string, unknown>)['x-event-version']).toBe(1);
-    expect((opts['headers'] as Record<string, unknown>)['x-tenant-id']).toBe('tenant-1');
-    expect((opts['headers'] as Record<string, unknown>)['x-workspace-id']).toBe('workspace-1');
-    expect((opts['headers'] as Record<string, unknown>)['x-cell-id']).toBe('cell-1');
-  });
-
-  it('publishes the full event JSON as the message body', async () => {
-    await adapter.publish(testEvent);
-
-    const [, , body] = mockChannel.publish.mock.calls[0] as [string, string, Buffer];
-    expect(JSON.parse(body.toString())).toMatchObject({ event_id: 'evt-001' });
-  });
-
-  it('sends to the DLX exchange with an empty routing key', async () => {
-    await adapter.publishToDlx(testEvent, 'max retries exceeded');
-
-    expect(mockChannel.publish).toHaveBeenCalledWith(
-      'cell.events.dlx',
-      '',
-      expect.any(Buffer),
-      { persistent: true },
-    );
-  });
-
-  it('embeds the failure reason in the DLX message body', async () => {
-    await adapter.publishToDlx(testEvent, 'max retries exceeded');
-
-    const [, , body] = mockChannel.publish.mock.calls[0] as [string, string, Buffer];
-    const message = JSON.parse(body.toString()) as { failure_reason: string };
-    expect(message.failure_reason).toBe('max retries exceeded');
-  });
-
-  it('closes channel and connection on module destroy', async () => {
-    await adapter.onModuleDestroy();
-
-    expect(mockChannel.close).toHaveBeenCalled();
-    expect(mockConnection.close).toHaveBeenCalled();
-  });
-
-  it('throws when publish is called before init', async () => {
-    const uninitialised = new RabbitMQAdapter();
-
-    await expect(uninitialised.publish(testEvent)).rejects.toThrow(
-      'RabbitMQ channel not initialised',
-    );
+      const [, opts] = (mockPublisher.publishToDlx as ReturnType<typeof vi.fn>).mock.calls[0] as [Buffer, Record<string, unknown>];
+      expect(opts['persistent']).toBe(true);
+    });
   });
 });

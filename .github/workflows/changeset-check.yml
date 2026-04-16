@@ -1,0 +1,47 @@
+name: Require Changeset
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, labeled, unlabeled]
+
+jobs:
+  check:
+    name: Changeset check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for changeset or skip label
+        env:
+          LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          # 'no-changeset': explicitly no release needed (docs, CI, infra)
+          # 'release', 'release:patch', 'release:minor', 'release:major':
+          #   changeset will be auto-created after merge
+          if echo "$LABELS" | grep -qE '"no-changeset"|"release'; then
+            echo "Label present — skipping check (changeset will be auto-created if applicable)."
+            exit 0
+          fi
+
+          git fetch origin main --depth=1
+
+          CHANGED=$(git diff --name-only origin/main...HEAD)
+          HAS_CHANGESET=$(echo "$CHANGED" | grep -E "^\.changeset/[^/]+\.md$" | grep -v "^\.changeset/README\.md$" || true)
+
+          if [ -z "$HAS_CHANGESET" ]; then
+            echo ""
+            echo "No changeset found in this PR."
+            echo ""
+            echo "Run the following and commit the generated file:"
+            echo "  pnpm changeset"
+            echo ""
+            echo "If this PR does not need a release (docs, CI, infra only),"
+            echo "add the 'no-changeset' label to skip this check."
+            exit 1
+          fi
+
+          echo "Changeset found:"
+          echo "$HAS_CHANGESET"

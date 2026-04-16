@@ -1,0 +1,70 @@
+name: Auto Changeset
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+jobs:
+  auto-changeset:
+    # Only run when a PR with a release* label is merged
+    if: >
+      github.event.pull_request.merged == true && (
+        contains(github.event.pull_request.labels.*.name, 'release') ||
+        contains(github.event.pull_request.labels.*.name, 'release:minor') ||
+        contains(github.event.pull_request.labels.*.name, 'release:major') ||
+        contains(github.event.pull_request.labels.*.name, 'release:patch')
+      )
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.RELEASE_TOKEN }}
+          ref: main
+          fetch-depth: 0
+
+      - name: Determine bump type from labels
+        id: bump
+        env:
+          LABELS: ${{ toJson(github.event.pull_request.labels.*.name) }}
+        run: |
+          if echo "$LABELS" | grep -q "release:major"; then
+            echo "type=major" >> "$GITHUB_OUTPUT"
+          elif echo "$LABELS" | grep -q "release:minor"; then
+            echo "type=minor" >> "$GITHUB_OUTPUT"
+          else
+            # 'release' or 'release:patch' → patch by default
+            echo "type=patch" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create changeset file
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          BUMP_TYPE: ${{ steps.bump.outputs.type }}
+        run: |
+          # Both @ikary/worker and @ikary/system-amqp are in the fixed group
+          # (.changeset/config.json) so they always release together. Include
+          # both so either package's CHANGELOG captures the entry.
+          {
+            echo '---'
+            echo "\"@ikary/worker\": $BUMP_TYPE"
+            echo "\"@ikary/system-amqp\": $BUMP_TYPE"
+            echo '---'
+            echo ''
+            echo "$PR_TITLE"
+          } > ".changeset/pr-${PR_NUMBER}.md"
+          echo "Created .changeset/pr-${PR_NUMBER}.md (${BUMP_TYPE})"
+          cat ".changeset/pr-${PR_NUMBER}.md"
+
+      - name: Commit and push to main
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add ".changeset/pr-${PR_NUMBER}.md"
+          git commit -m "chore: add changeset for PR #${PR_NUMBER}"
+          # Rebase in case another commit landed on main since we checked out
+          git pull --rebase origin main
+          git push origin main

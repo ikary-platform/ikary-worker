@@ -1,0 +1,185 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      published_packages:
+        description: 'JSON array, e.g. [{"name":"@ikary/worker","version":"0.2.0"}]'
+        required: true
+        type: string
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout ikary-worker
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          path: ikary-worker
+
+      - name: Checkout ikary-manifest (linked packages)
+        uses: actions/checkout@v4
+        with:
+          repository: ikary-platform/ikary-manifest
+          path: ikary-manifest
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ikary-worker/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ikary-worker/.nvmrc
+          cache: pnpm
+          cache-dependency-path: ikary-worker/pnpm-lock.yaml
+          registry-url: https://registry.npmjs.org
+
+      - name: Install manifest dependencies
+        working-directory: ikary-manifest
+        run: pnpm install --frozen-lockfile
+
+      - name: Build manifest packages needed by worker
+        working-directory: ikary-manifest
+        run: >-
+          pnpm build
+          --filter @ikary/system-db-core
+          --filter @ikary/cell-contract
+          --filter @ikary/cell-runtime-core
+          --filter @ikary/system-log-core
+          --filter @ikary/system-migration-core
+
+      - name: Install worker dependencies
+        working-directory: ikary-worker
+        run: pnpm install --frozen-lockfile
+
+      - name: Build worker packages
+        working-directory: ikary-worker
+        run: pnpm run build
+
+      - name: Create Release PR or Publish
+        id: changesets
+        if: github.event_name != 'workflow_dispatch'
+        uses: changesets/action@v1
+        with:
+          cwd: ikary-worker
+          publish: pnpm run release
+          version: pnpm run version
+          title: "chore: version packages"
+          commit: "chore: version packages"
+          createGithubReleases: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Generate release note with Claude and create release branch
+        if: steps.changesets.outputs.published == 'true' || github.event_name == 'workflow_dispatch'
+        working-directory: ikary-worker
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PUBLISHED_PACKAGES: ${{ github.event_name == 'workflow_dispatch' && inputs.published_packages || steps.changesets.outputs.publishedPackages }}
+          RELEASE_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+          GH_TOKEN: ${{ secrets.RELEASE_TOKEN }}
+        run: |
+          # @ikary/worker and @ikary/system-amqp are in the fixed group — same
+          # version for both. We pick @ikary/worker as the canonical tag.
+          WORKER_VERSION=$(echo "$PUBLISHED_PACKAGES" \
+            | jq -r '.[] | select(.name == "@ikary/worker") | .version' 2>/dev/null || true)
+
+          if [ -z "$WORKER_VERSION" ]; then
+            echo "@ikary/worker was not in this publish — skipping."
+            exit 0
+          fi
+
+          # Collect CHANGELOG sections for every published package
+          CHANGELOGS=""
+          while IFS= read -r pkg; do
+            PKG_NAME=$(echo "$pkg" | jq -r '.name')
+            PKG_VERSION=$(echo "$pkg" | jq -r '.version')
+
+            CHANGELOG=$(grep -rl "^# ${PKG_NAME}$" \
+              --include="CHANGELOG.md" . \
+              --exclude-dir=node_modules 2>/dev/null | head -1)
+
+            if [ -n "$CHANGELOG" ]; then
+              ESCAPED=$(printf '%s\n' "$PKG_VERSION" | sed 's/[.[\*^$(){}|+?]/\\&/g')
+              SECTION=$(awk \
+                "/^## ${ESCAPED}$/{found=1;next} /^## /{if(found)exit} found{print}" \
+                "$CHANGELOG" | grep -v '^[[:space:]]*$' || true)
+              if [ -n "$SECTION" ]; then
+                ENTRY=$(printf '\n\n=== %s v%s ===\n%s' "$PKG_NAME" "$PKG_VERSION" "$SECTION")
+                CHANGELOGS="${CHANGELOGS}${ENTRY}"
+              fi
+            fi
+          done < <(echo "$PUBLISHED_PACKAGES" | jq -c '.[]')
+
+          # Build the Claude prompt line by line to avoid column-0 content breaking YAML
+          PROMPT="You are writing release notes for ikary-worker v${WORKER_VERSION}."
+          PROMPT="${PROMPT}"$'\n\n'"The following packages were published. Here are the raw changeset entries:"
+          PROMPT="${PROMPT}"$'\n'"${CHANGELOGS}"
+          PROMPT="${PROMPT}"$'\n\n'"Write the release notes in exactly this format:"
+          PROMPT="${PROMPT}"$'\n\n'"# v${WORKER_VERSION}"
+          PROMPT="${PROMPT}"$'\n\n'"[2-3 sentences summarising what this release brings from a user perspective. No commit hashes.]"
+          PROMPT="${PROMPT}"$'\n\n'"## @ikary/worker"
+          PROMPT="${PROMPT}"$'\n\n'"[User-facing changes to the worker app and WorkerModule API.]"
+          PROMPT="${PROMPT}"$'\n\n'"## @ikary/system-amqp"
+          PROMPT="${PROMPT}"$'\n\n'"[Changes to the AMQP connection/publisher lib. Only include if there are user-facing changes.]"
+          PROMPT="${PROMPT}"$'\n\n'"Guidelines:"
+          PROMPT="${PROMPT}"$'\n'"- Past tense, active voice throughout"
+          PROMPT="${PROMPT}"$'\n'"- Strip all commit hashes (7-character hex strings followed by a colon)"
+          PROMPT="${PROMPT}"$'\n'"- Skip any entry that only says Updated dependencies"
+          PROMPT="${PROMPT}"$'\n'"- Group closely related changes into a single bullet"
+          PROMPT="${PROMPT}"$'\n'"- Omit any package section where the only content would be dependency bumps"
+          PROMPT="${PROMPT}"$'\n'"- Write for someone who uses ikary-worker but does not know the internal repo structure"
+
+          RESPONSE=$(curl -sf https://api.anthropic.com/v1/messages \
+            -H "x-api-key: ${ANTHROPIC_API_KEY}" \
+            -H "anthropic-version: 2023-06-01" \
+            -H "content-type: application/json" \
+            -d "$(jq -n \
+                  --arg model "claude-opus-4-6" \
+                  --arg content "$PROMPT" \
+                  '{
+                    model: $model,
+                    max_tokens: 1024,
+                    messages: [{ role: "user", content: $content }]
+                  }')" 2>/dev/null || true)
+
+          GENERATED=$(echo "$RESPONSE" | jq -r '.content[0].text // empty' 2>/dev/null || true)
+
+          if [ -n "$GENERATED" ]; then
+            NOTES="$GENERATED"
+            echo "Claude generated release note for v${WORKER_VERSION}"
+          else
+            echo "Claude API unavailable — falling back to raw changelog."
+            NOTES="# v${WORKER_VERSION}"$'\n\n'"${CHANGELOGS}"
+          fi
+
+          # Update/create GitHub Release. changesets tags as @ikary/worker@X.Y.Z.
+          RELEASE_TAG="@ikary/worker@${WORKER_VERSION}"
+          if gh release view "$RELEASE_TAG" --repo "${GITHUB_REPOSITORY}" >/dev/null 2>&1; then
+            gh release edit "$RELEASE_TAG" --notes "$NOTES" --repo "${GITHUB_REPOSITORY}"
+          else
+            gh release create "$RELEASE_TAG" --title "v${WORKER_VERSION}" --notes "$NOTES" --repo "${GITHUB_REPOSITORY}"
+          fi
+          echo "Updated GitHub Release ${RELEASE_TAG} with generated notes"
+
+          # Create a permanent release branch (release/* has no branch protection)
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git remote set-url origin "https://x-access-token:${RELEASE_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git checkout -b "release/v${WORKER_VERSION}"
+          git push origin "release/v${WORKER_VERSION}"
+          echo "Created release branch: release/v${WORKER_VERSION}"
