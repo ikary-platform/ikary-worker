@@ -40,6 +40,7 @@ import { MigrationRunner } from '@ikary/system-migration-core';
 const MIGRATION_PACKAGES = [
   '@ikary/cell-runtime-core',  // outbox + audit tables (owned by ikary-manifest)
   '@ikary/system-log-core',     // log settings, sinks, entries (worker requirement)
+  '@ikary/worker-consumer',     // consumer receipts + offsets (worker requirement)
 ] as const;
 
 // ── arg parsing ──────────────────────────────────────────────────────────────
