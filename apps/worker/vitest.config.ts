@@ -9,8 +9,16 @@ export default defineConfig({
     // Point workspace packages to their source so Vitest doesn't need a
     // pre-built dist/. Sub-path aliases must come before the root alias.
     alias: {
-      '@ikary/system-amqp/server': resolve(__dirname, '../../libs/system-amqp/src/server/index.ts'),
-      '@ikary/system-amqp':        resolve(__dirname, '../../libs/system-amqp/src/index.ts'),
+      '@ikary/system-amqp/server':          resolve(__dirname, '../../libs/system-amqp/src/server/index.ts'),
+      '@ikary/system-amqp':                 resolve(__dirname, '../../libs/system-amqp/src/index.ts'),
+      '@ikary/worker-consumer/server':      resolve(__dirname, '../../libs/worker-consumer/src/server/index.ts'),
+      '@ikary/worker-consumer':             resolve(__dirname, '../../libs/worker-consumer/src/index.ts'),
+      '@ikary/worker-audit/server':         resolve(__dirname, '../../libs/worker-audit/src/server/index.ts'),
+      '@ikary/worker-audit':                resolve(__dirname, '../../libs/worker-audit/src/index.ts'),
+      '@ikary/worker-analytics/server':     resolve(__dirname, '../../libs/worker-analytics/src/server/index.ts'),
+      '@ikary/worker-analytics':            resolve(__dirname, '../../libs/worker-analytics/src/index.ts'),
+      '@ikary/worker-activity-feed/server': resolve(__dirname, '../../libs/worker-activity-feed/src/server/index.ts'),
+      '@ikary/worker-activity-feed':        resolve(__dirname, '../../libs/worker-activity-feed/src/index.ts'),
     },
   },
   test: {

@@ -115,49 +115,55 @@ export class ConsumerRunner {
         return;
       }
 
-      // Step 4 — gap detection
+      // Step 4 — gap detection (skipped when consumer.ordered === false)
+      const isOrdered = this.consumer.ordered !== false;
       const aggregateKey = aggregateKeyOf(event);
-      const lastVersion = await this.offsets.getLastVersion(
-        this.consumer.name,
-        event.tenant_id,
-        aggregateKey,
-      );
 
-      if (lastVersion !== null) {
-        if (event.version <= lastVersion) {
-          // Already past this version — consistent with receipts having been
-          // cleaned up; ack and move on.
-          this.logger.debug(
-            `Event v${event.version} <= last v${lastVersion} for ${aggregateKey} — ack and skip`,
-          );
-          channel.ack(msg);
-          return;
-        }
-        if (event.version > lastVersion + 1) {
-          // A prior version is missing — wait for it by republishing with
-          // an incremented retry count. RabbitMQ will redeliver; by the time
-          // we hit maxRetries on the gap, it routes to the DLX for inspection.
-          this.logger.warn(
-            `Gap on ${aggregateKey}: expected v${lastVersion + 1}, got v${event.version} — requeuing`,
-          );
-          this.republishForRetry(channel, msg);
-          channel.ack(msg);
-          return;
+      if (isOrdered) {
+        const lastVersion = await this.offsets.getLastVersion(
+          this.consumer.name,
+          event.tenant_id,
+          aggregateKey,
+        );
+
+        if (lastVersion !== null) {
+          if (event.version <= lastVersion) {
+            // Already past this version — consistent with receipts having been
+            // cleaned up; ack and move on.
+            this.logger.debug(
+              `Event v${event.version} <= last v${lastVersion} for ${aggregateKey} — ack and skip`,
+            );
+            channel.ack(msg);
+            return;
+          }
+          if (event.version > lastVersion + 1) {
+            // A prior version is missing — wait for it by republishing with
+            // an incremented retry count. RabbitMQ will redeliver; by the time
+            // we hit maxRetries on the gap, it routes to the DLX for inspection.
+            this.logger.warn(
+              `Gap on ${aggregateKey}: expected v${lastVersion + 1}, got v${event.version} — requeuing`,
+            );
+            this.republishForRetry(channel, msg);
+            channel.ack(msg);
+            return;
+          }
         }
       }
 
-      // Step 5 — happy path: handler + receipt + offset, all in one transaction
+      // Step 5 — happy path: handler + receipt + (offset when ordered), all in one transaction
       try {
         await this.txRunner.withTransaction(async (tx) => {
           await this.consumer.handle(event, tx);
           await this.receipts.insert(this.consumer.name, event.event_id, tx);
-          await this.offsets.upsert(
-            this.consumer.name,
-            event.tenant_id,
-            aggregateKey,
-            event.version,
-            tx,
-          );
+          if (isOrdered) {
+            await this.offsets.upsert(
+              this.consumer.name,
+              event.tenant_id,
+              aggregateKey,
+              event.version,
+              tx,
+            );
+          }
         });
         channel.ack(msg);
       } catch (err) {
