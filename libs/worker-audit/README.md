@@ -20,7 +20,7 @@ Workspace-linked:
 
 ## Migrations
 
-Run the migration in `migrations/v0.1.0/` — creates `ikary_audit_entries` plus two indexes. If you use the `ikary local db migrate` CLI, this package is already in its `MIGRATION_PACKAGES` list.
+Run the migration in `migrations/v0.1.0/` — creates `ikary_audit_entries` plus two indexes. The `ikary local db migrate` CLI applies it automatically: `@ikary/worker-audit` is in the CLI's built-in default package list.
 
 ## Configuration
 

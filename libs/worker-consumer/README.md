@@ -37,7 +37,7 @@ Run the migrations in `migrations/v0.1.0/` before first boot. They create two ta
 - `ikary_event_consumer_receipts` — idempotency
 - `ikary_event_consumer_offsets` — gap detection
 
-Use the `ikary local db migrate` CLI (or add `@ikary/worker-consumer` to the CLI's `MIGRATION_PACKAGES` list).
+Use the `ikary local db migrate` CLI — `@ikary/worker-consumer` is in its built-in default package list, so the CLI applies these migrations automatically when run from any project that installs this package.
 
 ## Usage in NestJS
 
