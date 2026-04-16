@@ -20,7 +20,15 @@ export default defineConfig({
       provider: 'v8',
       reporter: ['text', 'lcov'],
       include: ['src/**/*.ts'],
-      exclude: ['src/**/*.spec.ts', 'src/**/index.ts', 'src/main.ts'],
+      exclude: [
+        'src/**/*.spec.ts',
+        'src/**/index.ts',
+        'src/main.ts',
+        'src/**/*.module.ts',               // module wiring — tested via smoke, not unit
+        'src/config/env.ts',                // thin Zod parse of process.env
+        'src/health/*.ts',                  // trivial passthrough controller
+        'src/adapters/null.adapter.ts',     // no-op adapter (no logic to test)
+      ],
       thresholds: { lines: 90, branches: 90, functions: 90, statements: 90 },
     },
   },
