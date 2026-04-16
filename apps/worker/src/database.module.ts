@@ -1,8 +1,9 @@
-import { Module } from '@nestjs/common';
+import { Global, Module } from '@nestjs/common';
 import { DatabaseService, databaseConnectionOptionsSchema } from '@ikary/system-db-core';
 import type { CellRuntimeDatabase } from '@ikary/cell-runtime-core';
 import { env } from './config/env.js';
 
+@Global()
 @Module({
   providers: [
     {

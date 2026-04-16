@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { DomainEventEnvelope } from '@ikary/cell-contract';
 import { buildRoutingKey } from '@ikary/system-amqp';
-import type { AmqpPublisherService } from '@ikary/system-amqp/server';
+import { AmqpPublisherService } from '@ikary/system-amqp/server';
 import type { IBrokerAdapter } from './broker-adapter.interface.js';
 
 /**

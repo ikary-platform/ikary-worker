@@ -14,11 +14,6 @@ import { BROKER_ADAPTER } from './adapters/broker-adapter.interface.js';
 import { OutboxProcessorService } from './outbox/outbox-processor.service.js';
 import { OutboxPollerService } from './outbox/outbox-poller.service.js';
 
-/**
- * Alias token used to pass the shared DatabaseService to SystemLogModule
- * without creating a second DB connection.
- */
-const WORKER_LOG_DB = Symbol('WORKER_LOG_DB');
 
 export interface WorkerModuleOptions {
   /**
@@ -106,7 +101,7 @@ export class WorkerModule {
         // through Pino with DB-backed sinks and the system-log-core UI viewer.
         // Note: log DB tables must exist (see migrations in @ikary/system-log-core).
         SystemLogModule.register({
-          databaseProviderToken: WORKER_LOG_DB,
+          databaseProviderToken: DatabaseService,
           service:          'ikary-worker',
           pretty:           env.LOG_PRETTY,
           seedDefaultSink:  true,
@@ -117,9 +112,6 @@ export class WorkerModule {
         ...amqpImports,
       ],
       providers: [
-        // Alias so SystemLogModule can reuse the shared DB connection without
-        // opening a second pool. useExisting means zero overhead.
-        { provide: WORKER_LOG_DB, useExisting: DatabaseService },
         outboxRepositoryProvider,
         brokerAdapterProvider,
         ...(options.handlers ?? []),
