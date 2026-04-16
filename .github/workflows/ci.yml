@@ -59,6 +59,45 @@ jobs:
         working-directory: ikary-worker
         run: pnpm run typecheck
 
+  coverage-worker-consumer:
+    name: Coverage — worker-consumer (100%)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout ikary-worker
+        uses: actions/checkout@v4
+        with:
+          path: ikary-worker
+
+      - name: Checkout ikary-manifest (linked packages)
+        uses: actions/checkout@v4
+        with:
+          repository: ikary-platform/ikary-manifest
+          path: ikary-manifest
+
+      - uses: pnpm/action-setup@v4
+        with:
+          package_json_file: ikary-worker/package.json
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: ikary-worker/.nvmrc
+          cache: pnpm
+          cache-dependency-path: ikary-worker/pnpm-lock.yaml
+
+      - name: Install manifest dependencies
+        working-directory: ikary-manifest
+        run: pnpm install --frozen-lockfile
+
+      - name: Install worker dependencies
+        working-directory: ikary-worker
+        run: pnpm install --frozen-lockfile
+
+      - name: Run coverage
+        working-directory: ikary-worker
+        run: pnpm --filter @ikary/worker-consumer test:coverage
+
   coverage-system-amqp:
     name: Coverage — system-amqp (100%)
     runs-on: ubuntu-latest
