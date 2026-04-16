@@ -24,14 +24,29 @@ export interface ClassifierInput {
   data:       Record<string, unknown>;
 }
 
+/**
+ * Upper bound on the raw input to normalizeDomain. Defends against ReDoS
+ * even if the regexes are individually safe — any hostile envelope producer
+ * sending a 10MB "entity.type" is bounded to 256 chars before regex runs.
+ * No legitimate business domain is anywhere near this long.
+ */
+const MAX_DOMAIN_INPUT_LENGTH = 256;
+
 function normalizeDomain(value: string | undefined): string {
   if (!value) return 'other';
-  const normalized = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-  return normalized.length > 0 ? normalized : 'other';
+
+  // Bound input BEFORE any regex touches it.
+  const bounded = value.trim().slice(0, MAX_DOMAIN_INPUT_LENGTH).toLowerCase();
+
+  // Split the leading/trailing underscore trim into two anchor-bound
+  // replacements to avoid the classic `/^_+|_+$/g` polynomial-time case
+  // (CodeQL js/polynomial-redos). Each of these alone is unambiguous: the
+  // anchors force a single start position per input.
+  const slugified = bounded.replace(/[^a-z0-9_]+/g, '_');
+  const leadingStripped = slugified.replace(/^_+/, '');
+  const trimmed = leadingStripped.replace(/_+$/, '');
+
+  return trimmed.length > 0 ? trimmed : 'other';
 }
 
 function resolveAction(eventName: string): string {
