@@ -3,13 +3,13 @@ import {
   consumerOptionsSchema,
   type ConsumerOptions,
   type ConsumerOptionsInput,
-} from '../shared/consumer-options.schema.js';
+} from '../config/consumer-options.schema.js';
 import {
   CONSUMER_DATABASE,
   CONSUMER_OPTIONS,
 } from './consumer.tokens.js';
-import { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
-import { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
+import { ConsumerReceiptsRepository } from './repositories/consumer-receipts.repository.js';
+import { ConsumerOffsetsRepository } from './repositories/consumer-offsets.repository.js';
 import { ConsumerRegistry } from './consumer.registry.js';
 
 export interface RegisterConsumerModuleOptions {

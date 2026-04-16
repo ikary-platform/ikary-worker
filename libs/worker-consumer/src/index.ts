@@ -3,11 +3,5 @@ export {
   consumerOptionsSchema,
   type ConsumerOptions,
   type ConsumerOptionsInput,
-} from './shared/consumer-options.schema.js';
-export type { IConsumer, HandlerTransaction } from './shared/consumer.contract.js';
-export {
-  RETRY_COUNT_HEADER,
-  getRetryCount,
-  incrementRetry,
-  type AmqpHeaders,
-} from './shared/retry-metadata.js';
+} from './config/consumer-options.schema.js';
+export * from './shared/index.js';

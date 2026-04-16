@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type amqplib from 'amqplib';
 import type { DomainEventEnvelope } from '@ikary/cell-contract';
 import type { IConsumer } from '../shared/consumer.contract.js';
-import type { ConsumerOptions } from '../shared/consumer-options.schema.js';
+import type { ConsumerOptions } from '../config/consumer-options.schema.js';
 import { RETRY_COUNT_HEADER } from '../shared/retry-metadata.js';
 import {
   ConsumerRunner,
@@ -12,8 +12,8 @@ import {
   type RunnerChannel,
   type TransactionRunner,
 } from './consumer.runner.js';
-import type { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
-import type { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
+import type { ConsumerReceiptsRepository } from './repositories/consumer-receipts.repository.js';
+import type { ConsumerOffsetsRepository } from './repositories/consumer-offsets.repository.js';
 
 // ── test fixtures ────────────────────────────────────────────────────────────
 

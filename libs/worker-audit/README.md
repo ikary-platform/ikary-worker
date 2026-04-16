@@ -27,6 +27,7 @@ Run the migration in `migrations/v0.1.0/` — creates `ikary_audit_entries` plus
 ```ts
 WorkerAuditModule.register({
   databaseProviderToken: DatabaseService,   // any NestJS token exposing a Kysely DatabaseService
+  retentionDays: 2555,                      // default; see Retention below
 })
 ```
 
@@ -37,6 +38,35 @@ type AppDatabase =
   & WorkerAuditDatabaseSchema
   & /* your own tables */ ;
 ```
+
+## Retention
+
+This module declares retention **intent** and exposes a DB **primitive**
+— it does not schedule or perform cleanup itself.
+
+- **Config:** `retentionDays` (default `2555`, ~7 years) — the declared
+  policy an external scheduler reads.
+- **Primitive:** `AuditRepository.deleteOlderThan(date)` — deletes rows
+  whose `occurred_at` is before the given date and returns the count of
+  deleted rows.
+
+A dedicated `ikary-scheduler` app (separate repo, post-v0.1.0) will
+consume the spec and orchestrate deletes safely across multi-pod
+deployments.
+
+| Setting | Behaviour |
+| ------- | --------- |
+| `retentionDays: <positive integer>` | Scheduler deletes rows older than that many days. |
+| `retentionDays: null`               | Scheduler skips this lib's sweep. |
+| *omitted*                           | Default: **2555 days (~7 years)** — covers the SOX / HIPAA / PCI DSS / GDPR accountability safe floor. |
+
+The scheduler should filter on `occurred_at` (event time), not
+`recorded_at` (projection write time), so a catch-up worker processing a
+backlog after downtime does not have its newly-written rows deleted
+before a human would reasonably expect them to be.
+
+Specific regulatory requirements should override explicitly. For legal-hold
+or "never delete" semantics, pass `retentionDays: null`.
 
 ## Usage in NestJS
 
@@ -80,7 +110,7 @@ Rows conform to `WorkerAuditEntriesTable`; parse into an `AuditEntry` at the API
 
 - `redaction_applied` is a structural column for downstream redaction pipelines; v0.1 writes `false` unconditionally. If your ingest contains PII, run redaction in the producer OR add a redaction step inside `AuditService.buildEntry` before the insert.
 - Actor trust — the audit row trusts the envelope's `actor` fields. Upstream (`cell-runtime-api` or equivalent) must authenticate the actor before producing the event.
-- Retention — v0.1 has no cleanup job. `ikary_audit_entries` grows unbounded; plan a cron or partition strategy per your compliance requirements.
+- Retention — see the [Retention](#retention) section. The default window is compliance-safe but may not match your specific regulatory requirement; override `retentionDays` explicitly if so.
 
 ## Versioning
 

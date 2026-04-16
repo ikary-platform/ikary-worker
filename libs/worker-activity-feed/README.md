@@ -30,6 +30,7 @@ Idempotent on `event_id`. Subscribe pattern is `'#'` (catch-all) — downstream 
 ```ts
 WorkerActivityFeedModule.register({
   databaseProviderToken: DatabaseService,
+  retentionDays: 30,                       // default; see Retention below
 })
 ```
 
@@ -40,6 +41,31 @@ type AppDatabase =
   & WorkerActivityFeedDatabaseSchema
   & /* your own tables */ ;
 ```
+
+## Retention
+
+This module declares retention **intent** and exposes a DB **primitive**
+— it does not schedule or perform cleanup itself.
+
+- **Config:** `retentionDays` (default `30`) — the declared policy an
+  external scheduler reads.
+- **Primitive:** `ActivityFeedRepository.deleteOlderThan(date)` — deletes
+  rows whose `occurred_at` is before the given date and returns the count
+  of deleted rows.
+
+A dedicated `ikary-scheduler` app (separate repo, post-v0.1.0) will
+consume the spec and orchestrate deletes safely across multi-pod
+deployments.
+
+| Setting | Behaviour |
+| ------- | --------- |
+| `retentionDays: <positive integer>` | Scheduler deletes rows older than that many days. |
+| `retentionDays: null`               | Scheduler skips this lib's sweep. |
+| *omitted*                           | Default: **30 days** — the feed is a "recent activity" view; older items aren't useful for the timeline. |
+
+The scheduler should filter on `occurred_at` so that events backfilled
+by a catch-up worker after downtime are not deleted before they have been
+shown.
 
 ## Usage in NestJS
 
@@ -85,7 +111,7 @@ await db
 ## Security / Isolation Notes
 
 - Payload is stored verbatim. If events may carry PII that shouldn't leak into a user-facing feed, redact at the producer before publishing.
-- Retention — v0.1 has no cleanup job. `ikary_activity_entries` grows unbounded; add a scheduled `DELETE` per your UX retention window (e.g. 90 days).
+- Retention — see the [Retention](#retention) section. Default is 30 days; override `retentionDays` if your UX surfaces older activity.
 
 ## Versioning
 
