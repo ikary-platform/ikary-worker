@@ -90,6 +90,13 @@ jobs:
         working-directory: ikary-manifest
         run: pnpm install --frozen-lockfile
 
+      - name: Build manifest packages needed by worker-consumer tests
+        working-directory: ikary-manifest
+        run: >-
+          pnpm build
+          --filter @ikary/system-db-core
+          --filter @ikary/cell-contract
+
       - name: Install worker dependencies
         working-directory: ikary-worker
         run: pnpm install --frozen-lockfile
