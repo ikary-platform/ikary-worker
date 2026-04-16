@@ -6,7 +6,7 @@ export { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
 export {
   ConsumerRunner,
   aggregateKeyOf,
-  isUniqueViolation,
+  isReceiptUniqueViolation,
   transactionRunnerFor,
   type RunnerChannel,
   type TransactionRunner,

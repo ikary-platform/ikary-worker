@@ -93,6 +93,17 @@ describe('ConsumerRegistry', () => {
     expect(channel.assertQueue).not.toHaveBeenCalled();
   });
 
+  it('accepts a single IConsumer (when multi: true is forgotten)', async () => {
+    // NestJS injects a single instance when the user registers a provider
+    // without `multi: true`. The registry must not crash with .map.
+    const registry = makeRegistry(
+      makeConsumer('audit', '#') as unknown as IConsumer[],  // single, not array
+      amqp,
+    );
+    await registry.onModuleInit();
+    expect(channel.assertQueue).toHaveBeenCalledWith('ikary.audit', expect.any(Object));
+  });
+
   it('asserts one durable queue per consumer with the correct DLX', async () => {
     const registry = makeRegistry([makeConsumer('audit', '#')], amqp);
     await registry.onModuleInit();
@@ -157,6 +168,30 @@ describe('ConsumerRegistry', () => {
     const [[, cb]] = channel.consume.mock.calls;
     // RabbitMQ passes null when the server cancels a consumer.
     expect(() => cb(null)).not.toThrow();
+  });
+
+  it('catches a rejected runner promise from the consume callback', async () => {
+    // Without the .catch in the registry, a runner-process rejection would
+    // be unhandled and crash the pod. Spy on ConsumerRunner.process to force
+    // a rejection and verify the callback swallows it.
+    const consumer = makeConsumer('audit', '#');
+    const registry = makeRegistry([consumer], amqp);
+
+    const { ConsumerRunner } = await import('./consumer.runner.js');
+    const spy = vi
+      .spyOn(ConsumerRunner.prototype, 'process')
+      .mockRejectedValueOnce(new Error('simulated unhandled'));
+
+    await registry.onModuleInit();
+    const [[, cb]] = channel.consume.mock.calls;
+
+    cb({ content: Buffer.from('{}'), fields: { routingKey: 'x' }, properties: {} } as never);
+    // Let the .catch handler run.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 
   // ── deferred subscribe ────────────────────────────────────────────────

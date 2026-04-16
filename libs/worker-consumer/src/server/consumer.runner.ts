@@ -37,15 +37,24 @@ export function transactionRunnerFor(db: DbService): TransactionRunner {
 }
 
 /**
- * PostgreSQL error code for unique_violation. If a receipt insert trips this
- * inside a handler transaction, we treat it as a duplicate delivery and ack
- * — NOT a real failure. Captured as a string because different driver layers
- * expose the code slightly differently.
+ * Narrowly detects a unique-constraint violation on the consumer receipts
+ * table — NOT any unique-constraint violation.
+ *
+ * PostgreSQL emits SQLSTATE 23505 for every unique-constraint violation
+ * including ones raised by user handlers writing to their own business
+ * tables. Treating any 23505 as a duplicate delivery would silently ack
+ * real handler failures and lose the event. We check the `constraint` field
+ * on the pg error to scope to the receipts PK (named
+ * `ikary_event_consumer_receipts_pkey` by PostgreSQL's auto-naming rule).
  */
-export function isUniqueViolation(err: unknown): boolean {
+export function isReceiptUniqueViolation(err: unknown): boolean {
   if (typeof err !== 'object' || err === null) return false;
-  const code = (err as { code?: unknown }).code;
-  return code === '23505';
+  const e = err as { code?: unknown; constraint?: unknown };
+  if (e.code !== '23505') return false;
+  return (
+    typeof e.constraint === 'string' &&
+    e.constraint.startsWith('ikary_event_consumer_receipts')
+  );
 }
 
 /**
@@ -72,93 +81,119 @@ export class ConsumerRunner {
   /**
    * Process one AMQP delivery. Always responds with exactly one ack OR nack
    * OR ack-after-republish — never leaves a message un-settled.
+   *
+   * Wrapped in a top-level try/catch so a rejection from receipts.exists()
+   * or offsets.getLastVersion() (both outside the inner transaction) cannot
+   * become an unhandled promise rejection — unhandled rejections crash the
+   * process on Node 15+, which would turn a transient DB hiccup into a pod
+   * restart instead of a retry.
    */
   async process(channel: RunnerChannel, msg: amqplib.ConsumeMessage): Promise<void> {
-    // Step 1 — parse envelope
-    const event = this.parseEnvelope(msg.content);
-    if (!event) {
-      // Poison message — to DLX immediately, no retry, no redeliver.
-      channel.nack(msg, false, false);
-      return;
-    }
+    try {
+      // Step 1 — parse envelope
+      const event = this.parseEnvelope(msg.content);
+      if (!event) {
+        // Poison message — to DLX immediately, no retry, no redeliver.
+        channel.nack(msg, false, false);
+        return;
+      }
 
-    // Step 2 — retry cap
-    const retries = getRetryCount(msg.properties.headers);
-    if (retries >= this.options.maxRetries) {
-      this.logger.warn(
-        `Max retries (${this.options.maxRetries}) exceeded for event ${event.event_id} — routing to DLX`,
-      );
-      channel.nack(msg, false, false);
-      return;
-    }
-
-    // Step 3 — idempotency fast path
-    if (await this.receipts.exists(this.consumer.name, event.event_id)) {
-      this.logger.debug(`Duplicate delivery of ${event.event_id} — ack and skip`);
-      channel.ack(msg);
-      return;
-    }
-
-    // Step 4 — gap detection
-    const aggregateKey = aggregateKeyOf(event);
-    const lastVersion = await this.offsets.getLastVersion(
-      this.consumer.name,
-      event.tenant_id,
-      aggregateKey,
-    );
-
-    if (lastVersion !== null) {
-      if (event.version <= lastVersion) {
-        // Already past this version — consistent with receipts having been
-        // cleaned up; ack and move on.
-        this.logger.debug(
-          `Event v${event.version} <= last v${lastVersion} for ${aggregateKey} — ack and skip`,
+      // Step 2 — retry cap
+      const retries = getRetryCount(msg.properties.headers);
+      if (retries >= this.options.maxRetries) {
+        this.logger.warn(
+          `Max retries (${this.options.maxRetries}) exceeded for event ${event.event_id} — routing to DLX`,
         );
+        channel.nack(msg, false, false);
+        return;
+      }
+
+      // Step 3 — idempotency fast path
+      if (await this.receipts.exists(this.consumer.name, event.event_id)) {
+        this.logger.debug(`Duplicate delivery of ${event.event_id} — ack and skip`);
         channel.ack(msg);
         return;
       }
-      if (event.version > lastVersion + 1) {
-        // A prior version is missing — wait for it by republishing with
-        // an incremented retry count. RabbitMQ will redeliver; by the time
-        // we hit maxRetries on the gap, it routes to the DLX for inspection.
-        this.logger.warn(
-          `Gap on ${aggregateKey}: expected v${lastVersion + 1}, got v${event.version} — requeuing`,
+
+      // Step 4 — gap detection
+      const aggregateKey = aggregateKeyOf(event);
+      const lastVersion = await this.offsets.getLastVersion(
+        this.consumer.name,
+        event.tenant_id,
+        aggregateKey,
+      );
+
+      if (lastVersion !== null) {
+        if (event.version <= lastVersion) {
+          // Already past this version — consistent with receipts having been
+          // cleaned up; ack and move on.
+          this.logger.debug(
+            `Event v${event.version} <= last v${lastVersion} for ${aggregateKey} — ack and skip`,
+          );
+          channel.ack(msg);
+          return;
+        }
+        if (event.version > lastVersion + 1) {
+          // A prior version is missing — wait for it by republishing with
+          // an incremented retry count. RabbitMQ will redeliver; by the time
+          // we hit maxRetries on the gap, it routes to the DLX for inspection.
+          this.logger.warn(
+            `Gap on ${aggregateKey}: expected v${lastVersion + 1}, got v${event.version} — requeuing`,
+          );
+          this.republishForRetry(channel, msg);
+          channel.ack(msg);
+          return;
+        }
+      }
+
+      // Step 5 — happy path: handler + receipt + offset, all in one transaction
+      try {
+        await this.txRunner.withTransaction(async (tx) => {
+          await this.consumer.handle(event, tx);
+          await this.receipts.insert(this.consumer.name, event.event_id, tx);
+          await this.offsets.upsert(
+            this.consumer.name,
+            event.tenant_id,
+            aggregateKey,
+            event.version,
+            tx,
+          );
+        });
+        channel.ack(msg);
+      } catch (err) {
+        if (isReceiptUniqueViolation(err)) {
+          // Race with another pod: it inserted the receipt first.
+          // NB: narrowed to the receipts-table constraint specifically so we
+          // do not swallow real unique-constraint errors raised by the user
+          // handler on their own business tables.
+          this.logger.debug(
+            `Unique violation on receipt for ${event.event_id} — ack as duplicate`,
+          );
+          channel.ack(msg);
+          return;
+        }
+        this.logger.error(
+          `Handler failed for event ${event.event_id}: ${(err as Error).message}`,
         );
         this.republishForRetry(channel, msg);
         channel.ack(msg);
-        return;
       }
-    }
-
-    // Step 5 — happy path: handler + receipt + offset, all in one transaction
-    try {
-      await this.txRunner.withTransaction(async (tx) => {
-        await this.consumer.handle(event, tx);
-        await this.receipts.insert(this.consumer.name, event.event_id, tx);
-        await this.offsets.upsert(
-          this.consumer.name,
-          event.tenant_id,
-          aggregateKey,
-          event.version,
-          tx,
-        );
-      });
-      channel.ack(msg);
     } catch (err) {
-      if (isUniqueViolation(err)) {
-        // Race with another delivery — another pod inserted the receipt
-        // first. Ack as duplicate.
-        this.logger.debug(
-          `Unique violation on receipt for ${event.event_id} — ack as duplicate`,
-        );
-        channel.ack(msg);
-        return;
-      }
+      // Fallback path — something outside the happy-path try/catch threw
+      // (receipts.exists, offsets.getLastVersion, or anything else we can't
+      // foresee). Republish with retry so the message isn't lost and isn't
+      // leaked as an unhandled rejection.
       this.logger.error(
-        `Handler failed for event ${event.event_id}: ${(err as Error).message}`,
+        `Unexpected error processing message: ${(err as Error).message} — requeuing`,
       );
-      this.republishForRetry(channel, msg);
-      channel.ack(msg);
+      try {
+        this.republishForRetry(channel, msg);
+        channel.ack(msg);
+      } catch {
+        // Republish itself failed (channel wedged?). Nack with requeue as a
+        // last resort so the broker keeps the message alive.
+        channel.nack(msg, false, true);
+      }
     }
   }
 

@@ -48,15 +48,22 @@ export class ConsumerRegistry implements OnModuleInit, BeforeApplicationShutdown
   private shuttingDown = false;
 
   constructor(
-    @Optional() @Inject(CONSUMER) consumers: IConsumer[] | undefined,
+    @Optional() @Inject(CONSUMER) consumers: IConsumer[] | IConsumer | undefined,
     @Inject(CONSUMER_OPTIONS) private readonly options: ConsumerOptions,
     @Inject(CONSUMER_DATABASE) dbService: DbService,
     private readonly amqp: AmqpConnectionService,
     private readonly receipts: ConsumerReceiptsRepository,
     private readonly offsets: ConsumerOffsetsRepository,
   ) {
+    // Normalise the injected value. NestJS returns an array when CONSUMER is
+    // registered with `multi: true`, but a single instance when a user forgets
+    // the flag. Accept both so a missing `multi: true` is a no-op instead of
+    // a `map is not a function` crash at startup.
+    const list =
+      consumers === undefined ? [] : Array.isArray(consumers) ? consumers : [consumers];
+
     const tx = transactionRunnerFor(dbService);
-    this.runners = (consumers ?? []).map(
+    this.runners = list.map(
       (consumer) => new ConsumerRunner(consumer, options, receipts, offsets, tx),
     );
   }
@@ -131,7 +138,15 @@ export class ConsumerRegistry implements OnModuleInit, BeforeApplicationShutdown
         queue,
         (msg) => {
           if (msg === null) return; // consumer cancelled by broker
-          void runner.process(channel, msg);
+          // Defence-in-depth: runner.process already wraps its body in a
+          // top-level try/catch, but we still attach .catch here so that any
+          // unforeseen rejection cannot escape as an unhandled promise and
+          // crash the pod.
+          runner.process(channel, msg).catch((err: unknown) => {
+            this.logger.error(
+              `Unhandled error in runner ${runner.consumer.name}: ${(err as Error).message}`,
+            );
+          });
         },
         { noAck: false },
       );

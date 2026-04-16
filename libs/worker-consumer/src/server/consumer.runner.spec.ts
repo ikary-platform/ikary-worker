@@ -7,7 +7,7 @@ import { RETRY_COUNT_HEADER } from '../shared/retry-metadata.js';
 import {
   ConsumerRunner,
   aggregateKeyOf,
-  isUniqueViolation,
+  isReceiptUniqueViolation,
   transactionRunnerFor,
   type RunnerChannel,
   type TransactionRunner,
@@ -112,21 +112,47 @@ describe('aggregateKeyOf', () => {
   });
 });
 
-describe('isUniqueViolation', () => {
-  it('returns true for PostgreSQL code 23505', () => {
-    expect(isUniqueViolation({ code: '23505' })).toBe(true);
+describe('isReceiptUniqueViolation', () => {
+  it('returns true for 23505 on a receipts-table constraint', () => {
+    expect(
+      isReceiptUniqueViolation({
+        code: '23505',
+        constraint: 'ikary_event_consumer_receipts_pkey',
+      }),
+    ).toBe(true);
   });
-  it('returns false for other codes', () => {
-    expect(isUniqueViolation({ code: '23502' })).toBe(false);
+
+  it('returns false for 23505 on a DIFFERENT table (user business constraint)', () => {
+    // Critical case: a handler writing to its own business table might hit a
+    // unique-constraint violation. We must NOT mistake that for a duplicate
+    // delivery — the event would be silently acked and lost.
+    expect(
+      isReceiptUniqueViolation({
+        code: '23505',
+        constraint: 'users_email_unique',
+      }),
+    ).toBe(false);
   });
+
+  it('returns false when the constraint field is missing', () => {
+    expect(isReceiptUniqueViolation({ code: '23505' })).toBe(false);
+  });
+
+  it('returns false for non-23505 error codes', () => {
+    expect(
+      isReceiptUniqueViolation({ code: '23502', constraint: 'ikary_event_consumer_receipts_pkey' }),
+    ).toBe(false);
+  });
+
   it('returns false when the value is not an error object', () => {
-    expect(isUniqueViolation(null)).toBe(false);
-    expect(isUniqueViolation('oops')).toBe(false);
-    expect(isUniqueViolation(42)).toBe(false);
-    expect(isUniqueViolation(undefined)).toBe(false);
+    expect(isReceiptUniqueViolation(null)).toBe(false);
+    expect(isReceiptUniqueViolation('oops')).toBe(false);
+    expect(isReceiptUniqueViolation(42)).toBe(false);
+    expect(isReceiptUniqueViolation(undefined)).toBe(false);
   });
-  it('returns false when the code is missing', () => {
-    expect(isUniqueViolation(new Error('no code'))).toBe(false);
+
+  it('returns false when constraint is non-string', () => {
+    expect(isReceiptUniqueViolation({ code: '23505', constraint: 42 })).toBe(false);
   });
 });
 
@@ -290,15 +316,65 @@ describe('ConsumerRunner.process', () => {
     expect(channel.nack).not.toHaveBeenCalled();
   });
 
-  it('acks as duplicate when a receipt unique violation races another pod', async () => {
+  it('acks as duplicate when the RECEIPTS constraint is violated (pod race)', async () => {
     (consumer.handle as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
-    // Make the transaction reject with a PG unique violation — simulates a
-    // parallel pod inserting the receipt first.
-    (tx.withTransaction as ReturnType<typeof vi.fn>).mockRejectedValueOnce({ code: '23505' });
+    (tx.withTransaction as ReturnType<typeof vi.fn>).mockRejectedValueOnce({
+      code: '23505',
+      constraint: 'ikary_event_consumer_receipts_pkey',
+    });
 
     await runner.process(channel, fakeMessage());
 
     expect(channel.ack).toHaveBeenCalledOnce();
     expect(channel.publish).not.toHaveBeenCalled();
+  });
+
+  it('republishes (does NOT ack as duplicate) for a business-table unique violation', async () => {
+    // A real handler bug: 23505 raised by a unique constraint on the handler's
+    // OWN business table. Must NOT silently ack — otherwise the event is lost.
+    (consumer.handle as ReturnType<typeof vi.fn>).mockResolvedValue(undefined);
+    (tx.withTransaction as ReturnType<typeof vi.fn>).mockRejectedValueOnce({
+      code: '23505',
+      constraint: 'invoices_number_unique',
+    });
+
+    await runner.process(channel, fakeMessage({ retries: 1 }));
+
+    expect(channel.publish).toHaveBeenCalledOnce();
+    expect(channel.publish).toHaveBeenCalledWith(
+      TEST_OPTIONS.exchange,
+      expect.any(String),
+      expect.any(Buffer),
+      expect.objectContaining({
+        headers: expect.objectContaining({ [RETRY_COUNT_HEADER]: 2 }),
+      }),
+    );
+  });
+
+  // ── unhandled errors outside the transaction ────────────────────────────
+
+  it('republishes when receipts.exists rejects (outer-catch path)', async () => {
+    (receipts.exists as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('db down'));
+    await runner.process(channel, fakeMessage({ retries: 2 }));
+    expect(channel.publish).toHaveBeenCalledOnce();
+    expect(channel.ack).toHaveBeenCalledOnce();
+  });
+
+  it('republishes when offsets.getLastVersion rejects (outer-catch path)', async () => {
+    (offsets.getLastVersion as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('db down'),
+    );
+    await runner.process(channel, fakeMessage());
+    expect(channel.publish).toHaveBeenCalledOnce();
+    expect(channel.ack).toHaveBeenCalledOnce();
+  });
+
+  it('nacks with requeue when even the republish step fails', async () => {
+    (receipts.exists as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error('db down'));
+    channel.publish.mockImplementationOnce(() => {
+      throw new Error('channel wedged');
+    });
+    await runner.process(channel, fakeMessage());
+    expect(channel.nack).toHaveBeenCalledWith(expect.anything(), false, true);
   });
 });
