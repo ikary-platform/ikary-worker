@@ -128,6 +128,23 @@ describe('AmqpConnectionService', () => {
     expect(mockConnect).toHaveBeenCalledTimes(1); // only initial connect
   });
 
+  it('does not schedule reconnect when close fires during intentional shutdown', async () => {
+    vi.useFakeTimers();
+    await service.onModuleInit();
+
+    // Real amqplib emits 'close' when you call connection.close() — simulate it.
+    connection.close.mockImplementation(async () => {
+      connection.emit('close');
+    });
+
+    await service.onModuleDestroy();
+
+    // The close handler ran (schedule attempted), but the shuttingDown guard
+    // blocked the timer. Advance past any hypothetical delay — no reconnect.
+    await vi.advanceTimersByTimeAsync(TEST_OPTIONS.reconnectDelayMs * 10);
+    expect(mockConnect).toHaveBeenCalledTimes(1); // only initial connect
+  });
+
   // ── connection events ────────────────────────────────────────────────────────
 
   it('nulls channel and connection when the connection closes', async () => {

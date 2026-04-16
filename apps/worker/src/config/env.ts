@@ -15,8 +15,15 @@ export const envSchema = z.object({
   RABBITMQ_EXCHANGE: z.string().default('cell.events'),
   RABBITMQ_DLX: z.string().default('cell.events.dlx'),
   PORT: z.coerce.number().int().positive().default(3002),
-  /** Enable pretty-printed logs (true for local dev, false for production JSON). */
-  LOG_PRETTY: z.coerce.boolean().default(false),
+  /**
+   * Enable pretty-printed logs (true for local dev, false for production JSON).
+   * Parsed explicitly because `z.coerce.boolean()` uses JS truthiness —
+   * `Boolean("false") === true`, so `LOG_PRETTY=false` would enable pretty logs.
+   */
+  LOG_PRETTY: z
+    .enum(['true', 'false', '1', '0'])
+    .default('false')
+    .transform((v) => v === 'true' || v === '1'),
 });
 
 export type Env = z.infer<typeof envSchema>;

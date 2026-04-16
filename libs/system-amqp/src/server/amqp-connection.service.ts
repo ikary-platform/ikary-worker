@@ -18,6 +18,12 @@ export class AmqpConnectionService implements OnModuleInit, OnModuleDestroy {
   private connection: amqplib.ChannelModel | null = null;
   private channel: amqplib.Channel | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  /**
+   * True once onModuleDestroy has been entered. Prevents scheduleReconnect
+   * from scheduling a new timer in response to the intentional 'close' event
+   * that amqplib emits when we call connection.close() during shutdown.
+   */
+  private shuttingDown = false;
 
   constructor(@Inject(SYSTEM_AMQP_OPTIONS) private readonly options: SystemAmqpOptions) {}
 
@@ -26,6 +32,9 @@ export class AmqpConnectionService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    // Set the guard BEFORE closing so the close event (emitted by amqplib
+    // when we call connection.close()) does not schedule a new reconnect.
+    this.shuttingDown = true;
     if (this.reconnectTimer !== null) {
       clearTimeout(this.reconnectTimer);
       this.reconnectTimer = null;
@@ -68,6 +77,7 @@ export class AmqpConnectionService implements OnModuleInit, OnModuleDestroy {
   }
 
   private scheduleReconnect(): void {
+    if (this.shuttingDown) return;
     this.reconnectTimer = setTimeout(async () => {
       this.reconnectTimer = null;
       this.logger.log('Attempting AMQP reconnect…');
