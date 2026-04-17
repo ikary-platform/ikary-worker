@@ -105,5 +105,5 @@ src/
   index.ts                        # shared surface exports
 ```
 
-The older flat `src/server/` layout in `worker-consumer` predates this
-convention — new libs use the structure above.
+All libs in this repo (including `worker-consumer`) follow this layout.
+New libs use the structure above without exception.

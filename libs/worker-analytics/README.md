@@ -26,6 +26,7 @@ Two SQL files in `migrations/v0.1.0/`:
 ```ts
 WorkerAnalyticsModule.register({
   databaseProviderToken: DatabaseService,
+  retentionDays: 90,                       // default; see Retention below
 })
 ```
 
@@ -36,6 +37,32 @@ type AppDatabase =
   & WorkerAnalyticsDatabaseSchema
   & /* your own tables */ ;
 ```
+
+## Retention
+
+This module declares retention **intent** and exposes a DB **primitive**
+— it does not schedule or perform cleanup itself.
+
+- **Config:** `retentionDays` (default `90`) — the declared policy an
+  external scheduler reads.
+- **Primitive:** `AnalyticsRepository.deleteOlderThan(date)` — deletes
+  buckets whose `bucket_start` is before the given date and returns the
+  count of deleted rows.
+
+A dedicated `ikary-scheduler` app (separate repo, post-v0.1.0) will
+consume the spec and orchestrate deletes safely across multi-pod
+deployments.
+
+| Setting | Behaviour |
+| ------- | --------- |
+| `retentionDays: <positive integer>` | Scheduler deletes buckets older than that many days. |
+| `retentionDays: null`               | Scheduler skips this lib's sweep. |
+| *omitted*                           | Default: **90 days** — dashboards typically look back a quarter; older buckets either get rolled up or are statistical noise. |
+
+The scheduler should filter on `bucket_start` (the hour being tracked),
+not `updated_at` (the last time the bucket was incremented), so a
+long-running event hitting an old bucket does not reset its retention
+clock.
 
 ## Usage in NestJS
 
@@ -94,7 +121,7 @@ await db
 ## Security / Isolation Notes
 
 - The classifier and repository are tenant-scoped via the envelope's `tenant_id`. Aggregate rows are keyed on `tenant_id` — never mix aggregates from different tenants.
-- Retention — v0.1 has no cleanup job. Plan a cron for `DELETE FROM ikary_analytics_buckets_hourly WHERE bucket_start < now() - interval 'N days'` per your dashboard retention window.
+- Retention — see the [Retention](#retention) section. Default is 90 days; override `retentionDays` to match your dashboard window.
 
 ## Versioning
 

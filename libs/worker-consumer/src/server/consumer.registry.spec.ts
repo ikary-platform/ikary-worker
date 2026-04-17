@@ -2,10 +2,10 @@ import { EventEmitter } from 'node:events';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { AmqpConnectionService } from '@ikary/system-amqp/server';
 import type { IConsumer } from '../shared/consumer.contract.js';
-import type { ConsumerOptions } from '../shared/consumer-options.schema.js';
+import type { ConsumerOptions } from '../config/consumer-options.schema.js';
 import { ConsumerRegistry } from './consumer.registry.js';
-import type { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
-import type { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
+import type { ConsumerReceiptsRepository } from './repositories/consumer-receipts.repository.js';
+import type { ConsumerOffsetsRepository } from './repositories/consumer-offsets.repository.js';
 
 const TEST_OPTIONS: ConsumerOptions = {
   queuePrefix:          'ikary.',

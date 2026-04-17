@@ -86,6 +86,42 @@ All options are optional with sensible defaults:
 | `prefetch` | `32` | Unacked messages per pod |
 | `maxRetries` | `5` | Retries before routing to DLX |
 | `dlx` | `cell.events.dlx` | Dead-letter exchange |
+| `receiptRetentionDays` | `7` | See [Retention](#retention) below. |
+
+## Retention
+
+This module declares retention **intent** and exposes a DB **primitive**
+— it does not schedule or perform cleanup itself.
+
+- **Config:** `receiptRetentionDays` (default `7`) — the declared policy
+  an external scheduler reads.
+- **Primitive:** `ConsumerReceiptsRepository.deleteOlderThan(date)` —
+  deletes receipts whose `received_at` is before the given date and
+  returns the count of deleted rows.
+
+A dedicated `ikary-scheduler` app (separate repo, post-v0.1.0) will
+consume the spec and orchestrate deletes safely across multi-pod
+deployments. Running `@Cron` inside a worker app would fire N
+simultaneous sweeps (one per pod).
+
+| Setting | Behaviour |
+| ------- | --------- |
+| `receiptRetentionDays: <positive integer>` | Scheduler deletes receipts older than that many days. |
+| `receiptRetentionDays: null`               | Scheduler skips this lib's sweep. |
+| *omitted*                                   | Default: **7 days** — conservative for the default `maxRetries: 5`. |
+
+`receiptRetentionDays` MUST exceed the broker's longest possible
+redelivery window. Deleting a receipt that still references a
+redeliverable message would let that message slip past idempotency and
+re-run the handler's side effects. 7 days is safe for a vanilla RabbitMQ
+setup with default retries; override upward if your DLX has long
+retention or you replay from archive.
+
+The `ikary_event_consumer_offsets` table is intentionally **NOT**
+included in the retention spec. Offsets track the `last_version` observed
+per-aggregate for gap detection — deleting a dormant aggregate's offset
+row would reset gap detection if the aggregate reactivates, letting
+out-of-order events through as if they were fresh.
 
 ## Versioning
 

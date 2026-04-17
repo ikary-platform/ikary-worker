@@ -3,11 +3,11 @@ import type amqplib from 'amqplib';
 import { DomainEventEnvelopeSchema, type DomainEventEnvelope } from '@ikary/cell-contract';
 import type { DatabaseService, Queryable } from '@ikary/system-db-core';
 import type { IConsumer } from '../shared/consumer.contract.js';
-import type { ConsumerOptions } from '../shared/consumer-options.schema.js';
+import type { ConsumerOptions } from '../config/consumer-options.schema.js';
 import { getRetryCount, incrementRetry } from '../shared/retry-metadata.js';
-import type { ConsumerDatabaseSchema } from './consumer.database.js';
-import type { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
-import type { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
+import type { ConsumerDatabaseSchema } from './db/schema.js';
+import type { ConsumerReceiptsRepository } from './repositories/consumer-receipts.repository.js';
+import type { ConsumerOffsetsRepository } from './repositories/consumer-offsets.repository.js';
 
 type DbService = DatabaseService<ConsumerDatabaseSchema>;
 

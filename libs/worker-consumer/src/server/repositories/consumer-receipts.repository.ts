@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common';
 import type { DatabaseService, Queryable } from '@ikary/system-db-core';
-import type { ConsumerDatabaseSchema } from './consumer.database.js';
-import { CONSUMER_DATABASE } from './consumer.tokens.js';
+import type { ConsumerDatabaseSchema } from '../db/schema.js';
+import { CONSUMER_DATABASE } from '../consumer.tokens.js';
 
 type DbService = DatabaseService<ConsumerDatabaseSchema>;
 

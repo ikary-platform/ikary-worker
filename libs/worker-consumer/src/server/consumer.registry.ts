@@ -10,12 +10,12 @@ import type amqplib from 'amqplib';
 import { AmqpConnectionService } from '@ikary/system-amqp/server';
 import type { DatabaseService } from '@ikary/system-db-core';
 import type { IConsumer } from '../shared/consumer.contract.js';
-import type { ConsumerOptions } from '../shared/consumer-options.schema.js';
+import type { ConsumerOptions } from '../config/consumer-options.schema.js';
 import { CONSUMER, CONSUMER_DATABASE, CONSUMER_OPTIONS } from './consumer.tokens.js';
-import { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
-import { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
+import { ConsumerReceiptsRepository } from './repositories/consumer-receipts.repository.js';
+import { ConsumerOffsetsRepository } from './repositories/consumer-offsets.repository.js';
 import { ConsumerRunner, transactionRunnerFor } from './consumer.runner.js';
-import type { ConsumerDatabaseSchema } from './consumer.database.js';
+import type { ConsumerDatabaseSchema } from './db/schema.js';
 
 type DbService = DatabaseService<ConsumerDatabaseSchema>;
 

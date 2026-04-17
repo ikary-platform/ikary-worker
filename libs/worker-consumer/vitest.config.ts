@@ -12,7 +12,7 @@ export default defineConfig({
         'src/**/*.spec.ts',
         'src/**/index.ts',
         'src/shared/consumer.contract.ts',    // interface + type alias — no runtime code
-        'src/server/consumer.database.ts',    // Kysely schema types — no runtime code
+        'src/server/db/schema.ts',            // Kysely schema types — no runtime code
       ],
       thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },
     },

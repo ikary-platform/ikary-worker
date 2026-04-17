@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { ConsumerModule } from './consumer.module.js';
 import { ConsumerRegistry } from './consumer.registry.js';
-import { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
-import { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
+import { ConsumerReceiptsRepository } from './repositories/consumer-receipts.repository.js';
+import { ConsumerOffsetsRepository } from './repositories/consumer-offsets.repository.js';
 import { CONSUMER_DATABASE, CONSUMER_OPTIONS } from './consumer.tokens.js';
 
 const FAKE_DB_TOKEN = Symbol('FAKE_DB');
