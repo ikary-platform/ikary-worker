@@ -43,4 +43,9 @@ describe('WorkerAnalyticsModule.register', () => {
     expect(mod.exports).toContain(AnalyticsService);
     expect(mod.exports).toContain(AnalyticsConsumer);
   });
+
+  it('is registered as a global module so ConsumerModule can inject AnalyticsService', () => {
+    const mod = WorkerAnalyticsModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
+    expect(mod.global).toBe(true);
+  });
 });

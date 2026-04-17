@@ -55,10 +55,12 @@ export class ConsumerRegistry implements OnModuleInit, BeforeApplicationShutdown
     private readonly receipts: ConsumerReceiptsRepository,
     private readonly offsets: ConsumerOffsetsRepository,
   ) {
-    // Normalise the injected value. NestJS returns an array when CONSUMER is
-    // registered with `multi: true`, but a single instance when a user forgets
-    // the flag. Accept both so a missing `multi: true` is a no-op instead of
-    // a `map is not a function` crash at startup.
+    // Normalise the injected value. The host app may pass either:
+    //   - A single useFactory provider returning IConsumer[] (recommended;
+    //     see apps/worker/src/app.module.ts).
+    //   - A `multi: true` provider resolving to one IConsumer (older/partial
+    //     setup; we accept a single instance so the app still boots).
+    //   - Nothing at all (no consumers wired).
     const list =
       consumers === undefined ? [] : Array.isArray(consumers) ? consumers : [consumers];
 

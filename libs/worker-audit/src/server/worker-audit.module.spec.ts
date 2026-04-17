@@ -56,4 +56,14 @@ describe('WorkerAuditModule.register', () => {
     expect(mod.exports).toContain(AuditService);
     expect(mod.exports).toContain(AuditConsumer);
   });
+
+  it('is registered as a global module so ConsumerModule can inject AuditService', () => {
+    // ConsumerModule instantiates AuditConsumer via its CONSUMER multi-provider
+    // token, which means the consumer's constructor dependencies (including
+    // AuditService) must be resolvable from ConsumerModule's scope. Marking the
+    // dynamic registration global matches the DatabaseModule / SystemAmqpModule
+    // convention and avoids requiring every sibling module to re-import this one.
+    const mod = WorkerAuditModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
+    expect(mod.global).toBe(true);
+  });
 });

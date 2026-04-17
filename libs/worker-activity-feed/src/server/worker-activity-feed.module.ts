@@ -11,6 +11,13 @@ import {
   WORKER_ACTIVITY_FEED_DATABASE,
 } from './worker-activity-feed.tokens.js';
 
+/**
+ * Registered as a global module so the sibling `ConsumerModule` (which
+ * instantiates `ActivityFeedConsumer` via its `CONSUMER` multi-provider
+ * token) can inject `ActivityFeedService` without the app having to
+ * re-import this module everywhere. Matches the `@Global()` pattern used by
+ * the other OOTB projection modules.
+ */
 @Module({})
 export class WorkerActivityFeedModule {
   static register(input: WorkerActivityFeedConfig): DynamicModule {
@@ -30,6 +37,7 @@ export class WorkerActivityFeedModule {
 
     return {
       module: WorkerActivityFeedModule,
+      global: true,
       providers,
       exports: [
         ActivityFeedRepository,

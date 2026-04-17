@@ -15,8 +15,7 @@
     "test:coverage": "vitest run --coverage",
     "migrate": "ikary local db migrate",
     "migrate:status": "ikary local db status",
-    "migrate:dry-run": "ikary local db migrate --dry-run",
-    "migrate:standalone": "tsx scripts/migrate.ts"
+    "migrate:dry-run": "ikary local db migrate --dry-run"
   },
   "dependencies": {
     "@ikary/cell-contract": "^0.3.0",
@@ -38,12 +37,10 @@
   },
   "devDependencies": {
     "@ikary/cli": "^0.3.0",
-    "@ikary/system-migration-core": "^0.3.0",
     "@swc-node/register": "^1.11.1",
     "@swc/core": "^1.15.26",
     "@types/node": "^20.0.0",
     "tsup": "^8.0.2",
-    "tsx": "^4.19.0",
     "typescript": "^5.5.3",
     "vitest": "^3.0.0"
   },

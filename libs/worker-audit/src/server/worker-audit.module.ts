@@ -10,6 +10,12 @@ import { WORKER_AUDIT_CONFIG, WORKER_AUDIT_DATABASE } from './worker-audit.token
  * AuditConsumer in its ConsumerModule.register({ consumers }) — we keep the
  * consumer wiring explicit at the app level to avoid multi-provider DI traps
  * across dynamic module boundaries.
+ *
+ * Registered as a global module so the sibling `ConsumerModule` (which
+ * instantiates `AuditConsumer` via its `CONSUMER` multi-provider token) can
+ * inject `AuditService` without the app having to re-import this module into
+ * every module that needs it. Matches the `@Global()` pattern used by
+ * `DatabaseModule`, `SystemLogModule`, and `SystemAmqpModule`.
  */
 @Module({})
 export class WorkerAuditModule {
@@ -30,6 +36,7 @@ export class WorkerAuditModule {
 
     return {
       module: WorkerAuditModule,
+      global: true,
       providers,
       exports: [
         AuditRepository,

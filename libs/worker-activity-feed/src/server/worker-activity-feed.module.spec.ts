@@ -44,4 +44,9 @@ describe('WorkerActivityFeedModule.register', () => {
     expect(mod.exports).toContain(ActivityFeedService);
     expect(mod.exports).toContain(ActivityFeedConsumer);
   });
+
+  it('is registered as a global module so ConsumerModule can inject ActivityFeedService', () => {
+    const mod = WorkerActivityFeedModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
+    expect(mod.global).toBe(true);
+  });
 });

@@ -42,4 +42,13 @@ describe('SystemAmqpModule.register', () => {
     expect(mod.exports).toContain(AmqpConnectionService);
     expect(mod.exports).toContain(AmqpPublisherService);
   });
+
+  it('is marked global so sibling modules can inject AmqpConnectionService', () => {
+    // ConsumerModule — registered as a sibling of SystemAmqpModule —
+    // needs AmqpConnectionService available without an explicit import.
+    // Making the dynamic registration global matches the convention used by
+    // DatabaseModule and SystemLogModule in the worker app.
+    const mod = SystemAmqpModule.register(TEST_OPTIONS);
+    expect(mod.global).toBe(true);
+  });
 });
