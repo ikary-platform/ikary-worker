@@ -160,4 +160,41 @@ describe('SchedulerPublisher', () => {
       expect.objectContaining({ entityKey: null, entityId: null }),
     );
   });
+
+  it('includes all non-sentinel scope segments in event_id', async () => {
+    await publisher.emit({
+      name: 'reminder.invoice',
+      data: {},
+      scope: {
+        tenantId:    'tenant-1',
+        workspaceId: 'ws-2',
+        cellId:      'cell-3',
+        entityKey:   'invoice',
+        entityId:    'inv-456',
+      },
+    });
+    expect(jobs.upsertPending).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 'scheduler-reminder.invoice-tenant-1-ws-2-cell-3-invoice-inv-456-2026-04-17',
+      }),
+    );
+  });
+
+  it('produces distinct event_ids for same-name jobs with different workspace scope', async () => {
+    await publisher.emit({
+      name: 'digest.notifications',
+      data: {},
+      scope: { tenantId: 'tenant-1', workspaceId: 'ws-A' },
+    });
+    await publisher.emit({
+      name: 'digest.notifications',
+      data: {},
+      scope: { tenantId: 'tenant-1', workspaceId: 'ws-B' },
+    });
+    const id1 = jobs.upsertPending.mock.calls[0][0].id;
+    const id2 = jobs.upsertPending.mock.calls[1][0].id;
+    expect(id1).not.toBe(id2);
+    expect(id1).toBe('scheduler-digest.notifications-tenant-1-ws-A-2026-04-17');
+    expect(id2).toBe('scheduler-digest.notifications-tenant-1-ws-B-2026-04-17');
+  });
 });

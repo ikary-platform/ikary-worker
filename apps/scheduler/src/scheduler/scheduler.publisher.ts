@@ -35,7 +35,12 @@ export class SchedulerPublisher {
     const entityKey   = input.scope?.entityKey   ?? null;
     const entityId    = input.scope?.entityId    ?? null;
 
-    const scopeSuffix = tenantId === '_scheduler' ? '' : `-${tenantId}`;
+    // Build scope suffix from all non-sentinel scope segments so that
+    // two jobs with the same name on the same day but different scopes
+    // produce distinct event_ids (prevents receipt dedup collisions).
+    const scopeParts = [tenantId, workspaceId, cellId, entityKey, entityId]
+      .filter((v) => v !== null && v !== '_scheduler');
+    const scopeSuffix = scopeParts.length > 0 ? `-${scopeParts.join('-')}` : '';
     const eventId = `scheduler-${input.name}${scopeSuffix}-${dateKey}`;
 
     await this.jobs.upsertPending({
