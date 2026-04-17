@@ -1,18 +1,27 @@
 import { Module } from '@nestjs/common';
 import { DatabaseService } from '@ikary/system-db-core';
-import { ConsumerModule, CONSUMER } from '@ikary/worker-consumer/server';
-import { WorkerAuditModule, AuditConsumer } from '@ikary/worker-audit/server';
-import { WorkerAnalyticsModule, AnalyticsConsumer } from '@ikary/worker-analytics/server';
+import {
+  ConsumerModule,
+  CONSUMER,
+  ReceiptRetentionConsumer,
+} from '@ikary/worker-consumer/server';
+import { WorkerAuditModule, AuditConsumer, AuditRetentionConsumer } from '@ikary/worker-audit/server';
+import {
+  WorkerAnalyticsModule,
+  AnalyticsConsumer,
+  AnalyticsRetentionConsumer,
+} from '@ikary/worker-analytics/server';
 import {
   WorkerActivityFeedModule,
   ActivityFeedConsumer,
+  ActivityFeedRetentionConsumer,
 } from '@ikary/worker-activity-feed/server';
 import { WorkerModule } from './worker.module.js';
 
 /**
  * The OOTB consumers wired into this reference app. A single `useFactory`
- * provider collects all three consumer classes (already instantiated and
- * globally available via their own Worker*Module) into the array that
+ * provider collects all consumer classes (already instantiated and globally
+ * available via their own Worker*Module) into the array that
  * `ConsumerRegistry` expects at `@Inject(CONSUMER)`.
  *
  * This shape (one non-multi factory) is used instead of three `multi: true`
@@ -29,17 +38,32 @@ const CONSUMER_PROVIDERS = [
       audit: AuditConsumer,
       analytics: AnalyticsConsumer,
       activity: ActivityFeedConsumer,
-    ) => [audit, analytics, activity],
-    inject: [AuditConsumer, AnalyticsConsumer, ActivityFeedConsumer],
+      auditRetention: AuditRetentionConsumer,
+      analyticsRetention: AnalyticsRetentionConsumer,
+      activityRetention: ActivityFeedRetentionConsumer,
+      receiptRetention: ReceiptRetentionConsumer,
+    ) => [
+      audit, analytics, activity,
+      auditRetention, analyticsRetention, activityRetention, receiptRetention,
+    ],
+    inject: [
+      AuditConsumer, AnalyticsConsumer, ActivityFeedConsumer,
+      AuditRetentionConsumer, AnalyticsRetentionConsumer,
+      ActivityFeedRetentionConsumer, ReceiptRetentionConsumer,
+    ],
   },
 ];
 
 /**
- * Default OSS application wiring — ships with three OOTB consumers:
+ * Default OSS application wiring — ships with seven OOTB consumers:
  *
- *   - AuditConsumer          → ikary_audit_entries              (compliance trail)
- *   - AnalyticsConsumer      → ikary_analytics_buckets_hourly   (dashboards)
- *   - ActivityFeedConsumer   → ikary_activity_entries           (user-facing feed)
+ *   - AuditConsumer                  → ikary_audit_entries              (compliance trail)
+ *   - AnalyticsConsumer              → ikary_analytics_buckets_hourly   (dashboards)
+ *   - ActivityFeedConsumer           → ikary_activity_entries           (user-facing feed)
+ *   - AuditRetentionConsumer         → scheduler.retention.audit        (cleanup)
+ *   - AnalyticsRetentionConsumer     → scheduler.retention.analytics    (cleanup)
+ *   - ActivityFeedRetentionConsumer  → scheduler.retention.activity-feed (cleanup)
+ *   - ReceiptRetentionConsumer       → scheduler.retention.consumer-receipts (cleanup)
  *
  * Each is a thin IConsumer backed by a service + repository. A downstream
  * `ikary-enterprise-worker` repo composes on top by building its own

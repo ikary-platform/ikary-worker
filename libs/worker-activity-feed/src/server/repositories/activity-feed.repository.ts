@@ -15,6 +15,22 @@ export class ActivityFeedRepository {
     @Inject(WORKER_ACTIVITY_FEED_DATABASE) private readonly dbService: DbService,
   ) {}
 
+  /**
+   * Delete activity entries older than the given date. Returns the count of
+   * deleted rows. Pass `client` to run inside a consumer transaction.
+   */
+  async deleteOlderThan(
+    olderThan: Date,
+    client?: Queryable<WorkerActivityFeedDatabaseSchema>,
+  ): Promise<number> {
+    const qb = client ?? this.dbService.db;
+    const result = await qb
+      .deleteFrom('ikary_activity_entries')
+      .where('occurred_at', '<', olderThan)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0);
+  }
+
   async insertIfNotExists(
     entry: ActivityEntry,
     client?: Queryable<WorkerActivityFeedDatabaseSchema>,

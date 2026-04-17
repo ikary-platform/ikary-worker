@@ -6,6 +6,7 @@ import {
 import { AnalyticsRepository } from './repositories/analytics.repository.js';
 import { AnalyticsService } from '../modules/analytics/analytics.service.js';
 import { AnalyticsConsumer } from '../modules/analytics/analytics.consumer.js';
+import { AnalyticsRetentionConsumer } from '../modules/analytics/analytics-retention.consumer.js';
 import { WORKER_ANALYTICS_CONFIG, WORKER_ANALYTICS_DATABASE } from './worker-analytics.tokens.js';
 
 /**
@@ -30,6 +31,7 @@ export class WorkerAnalyticsModule {
       AnalyticsRepository,
       AnalyticsService,
       AnalyticsConsumer,
+      AnalyticsRetentionConsumer,
     ];
 
     return {
@@ -40,6 +42,7 @@ export class WorkerAnalyticsModule {
         AnalyticsRepository,
         AnalyticsService,
         AnalyticsConsumer,
+        AnalyticsRetentionConsumer,
         WORKER_ANALYTICS_CONFIG,
         WORKER_ANALYTICS_DATABASE,
       ],

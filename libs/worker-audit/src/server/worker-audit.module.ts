@@ -3,6 +3,7 @@ import { workerAuditConfigSchema, type WorkerAuditConfig } from '../config/worke
 import { AuditRepository } from './repositories/audit.repository.js';
 import { AuditService } from '../modules/audit/audit.service.js';
 import { AuditConsumer } from '../modules/audit/audit.consumer.js';
+import { AuditRetentionConsumer } from '../modules/audit/audit-retention.consumer.js';
 import { WORKER_AUDIT_CONFIG, WORKER_AUDIT_DATABASE } from './worker-audit.tokens.js';
 
 /**
@@ -32,6 +33,7 @@ export class WorkerAuditModule {
       AuditRepository,
       AuditService,
       AuditConsumer,
+      AuditRetentionConsumer,
     ];
 
     return {
@@ -42,6 +44,7 @@ export class WorkerAuditModule {
         AuditRepository,
         AuditService,
         AuditConsumer,
+        AuditRetentionConsumer,
         WORKER_AUDIT_CONFIG,
         WORKER_AUDIT_DATABASE,
       ],

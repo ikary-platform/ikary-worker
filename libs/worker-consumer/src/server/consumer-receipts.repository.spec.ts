@@ -19,6 +19,7 @@ function makeDbService(returnValue: unknown) {
     db: {
       selectFrom: vi.fn().mockReturnValue(qb),
       insertInto: vi.fn().mockReturnValue(qb),
+      deleteFrom: vi.fn().mockReturnValue(qb),
     },
   };
 }
@@ -63,5 +64,33 @@ describe('ConsumerReceiptsRepository', () => {
     await repo.insert('audit', 'evt-003', tx as never);
     expect(tx.insertInto).toHaveBeenCalledWith('ikary_event_consumer_receipts');
     expect(db.db.insertInto).not.toHaveBeenCalled();
+  });
+
+  describe('deleteOlderThan', () => {
+    it('uses DatabaseService.db when no client is supplied', async () => {
+      db = makeDbService({ numDeletedRows: BigInt(7) });
+      repo = new ConsumerReceiptsRepository(db as never);
+      const count = await repo.deleteOlderThan(new Date('2026-01-01'));
+      expect(db.db.deleteFrom).toHaveBeenCalledWith('ikary_event_consumer_receipts');
+      expect(db.qb.where).toHaveBeenCalledWith('received_at', '<', new Date('2026-01-01'));
+      expect(count).toBe(7);
+    });
+
+    it('uses the supplied transaction client when provided', async () => {
+      db = makeDbService(undefined);
+      repo = new ConsumerReceiptsRepository(db as never);
+      const txQb = makeQueryBuilder({ numDeletedRows: BigInt(2) });
+      const tx = { deleteFrom: vi.fn().mockReturnValue(txQb) };
+      await repo.deleteOlderThan(new Date('2026-01-01'), tx as never);
+      expect(tx.deleteFrom).toHaveBeenCalledWith('ikary_event_consumer_receipts');
+      expect(db.db.deleteFrom).not.toHaveBeenCalled();
+    });
+
+    it('returns 0 when numDeletedRows is undefined', async () => {
+      db = makeDbService({ numDeletedRows: undefined });
+      repo = new ConsumerReceiptsRepository(db as never);
+      const count = await repo.deleteOlderThan(new Date('2026-01-01'));
+      expect(count).toBe(0);
+    });
   });
 });
