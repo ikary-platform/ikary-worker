@@ -14,3 +14,4 @@ export {
 export { ConsumerHealthIndicator, type ConsumerHealthResult } from './health/consumer.health-indicator.js';
 export { CONSUMER, CONSUMER_DATABASE, CONSUMER_OPTIONS } from './consumer.tokens.js';
 export type { ConsumerDatabaseSchema, ConsumerReceiptsTable, ConsumerOffsetsTable } from './consumer.database.js';
+export { ReceiptRetentionConsumer } from '../modules/retention/receipt-retention.consumer.js';

@@ -4,6 +4,7 @@
   "commit": false,
   "fixed": [[
     "@ikary/worker",
+    "@ikary/scheduler",
     "@ikary/system-amqp",
     "@ikary/worker-consumer",
     "@ikary/worker-audit",

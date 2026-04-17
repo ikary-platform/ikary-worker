@@ -10,6 +10,7 @@ import {
 import { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
 import { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
 import { ConsumerRegistry } from './consumer.registry.js';
+import { ReceiptRetentionConsumer } from '../modules/retention/receipt-retention.consumer.js';
 
 export interface RegisterConsumerModuleOptions {
   /**
@@ -57,6 +58,7 @@ export class ConsumerModule {
       ConsumerReceiptsRepository,
       ConsumerOffsetsRepository,
       ConsumerRegistry,
+      ReceiptRetentionConsumer,
       ...(input.consumers ?? []),
     ];
 
@@ -69,6 +71,7 @@ export class ConsumerModule {
         ConsumerReceiptsRepository,
         ConsumerOffsetsRepository,
         ConsumerRegistry,
+        ReceiptRetentionConsumer,
       ],
     };
   }

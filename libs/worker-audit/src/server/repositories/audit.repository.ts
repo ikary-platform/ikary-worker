@@ -16,6 +16,22 @@ export class AuditRepository {
   constructor(@Inject(WORKER_AUDIT_DATABASE) private readonly dbService: DbService) {}
 
   /**
+   * Delete audit entries older than the given date. Returns the count of
+   * deleted rows. Pass `client` to run inside a consumer transaction.
+   */
+  async deleteOlderThan(
+    olderThan: Date,
+    client?: Queryable<WorkerAuditDatabaseSchema>,
+  ): Promise<number> {
+    const qb = client ?? this.dbService.db;
+    const result = await qb
+      .deleteFrom('ikary_audit_entries')
+      .where('occurred_at', '<', olderThan)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0);
+  }
+
+  /**
    * Insert one audit entry, silently skipping duplicates by `event_id` (the
    * primary key). Idempotent under at-least-once broker delivery and under
    * republish-to-self retry loops.

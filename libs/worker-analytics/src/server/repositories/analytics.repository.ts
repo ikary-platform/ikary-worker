@@ -16,6 +16,22 @@ export class AnalyticsRepository {
   constructor(@Inject(WORKER_ANALYTICS_DATABASE) private readonly dbService: DbService) {}
 
   /**
+   * Delete analytics buckets older than the given date. Returns the count of
+   * deleted rows. Pass `client` to run inside a consumer transaction.
+   */
+  async deleteOlderThan(
+    olderThan: Date,
+    client?: Queryable<WorkerAnalyticsDatabaseSchema>,
+  ): Promise<number> {
+    const qb = client ?? this.dbService.db;
+    const result = await qb
+      .deleteFrom('ikary_analytics_buckets_hourly')
+      .where('bucket_start', '<', olderThan)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0);
+  }
+
+  /**
    * Upsert an hourly bucket:
    *   - first event in the hour → insert with event_count=1, failure_count=0|1
    *   - subsequent events in the same PK → increment counters

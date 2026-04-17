@@ -6,6 +6,7 @@ import {
 import { ActivityFeedRepository } from './repositories/activity-feed.repository.js';
 import { ActivityFeedService } from '../modules/activity-feed/activity-feed.service.js';
 import { ActivityFeedConsumer } from '../modules/activity-feed/activity-feed.consumer.js';
+import { ActivityFeedRetentionConsumer } from '../modules/activity-feed/activity-feed-retention.consumer.js';
 import {
   WORKER_ACTIVITY_FEED_CONFIG,
   WORKER_ACTIVITY_FEED_DATABASE,
@@ -33,6 +34,7 @@ export class WorkerActivityFeedModule {
       ActivityFeedRepository,
       ActivityFeedService,
       ActivityFeedConsumer,
+      ActivityFeedRetentionConsumer,
     ];
 
     return {
@@ -43,6 +45,7 @@ export class WorkerActivityFeedModule {
         ActivityFeedRepository,
         ActivityFeedService,
         ActivityFeedConsumer,
+        ActivityFeedRetentionConsumer,
         WORKER_ACTIVITY_FEED_CONFIG,
         WORKER_ACTIVITY_FEED_DATABASE,
       ],

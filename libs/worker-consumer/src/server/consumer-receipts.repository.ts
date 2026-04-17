@@ -26,6 +26,22 @@ export class ConsumerReceiptsRepository {
     return row !== undefined;
   }
 
+  /**
+   * Delete receipts older than the given date. Returns the count of deleted
+   * rows. Pass `client` to run inside a consumer transaction.
+   */
+  async deleteOlderThan(
+    olderThan: Date,
+    client?: Queryable<ConsumerDatabaseSchema>,
+  ): Promise<number> {
+    const qb = client ?? this.dbService.db;
+    const result = await qb
+      .deleteFrom('ikary_event_consumer_receipts')
+      .where('received_at', '<', olderThan)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0);
+  }
+
   async insert(
     consumerName: string,
     eventId: string,
