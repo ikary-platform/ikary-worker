@@ -7,7 +7,6 @@ import {
 import { AuditRepository } from './repositories/audit.repository.js';
 import { AuditService } from '../modules/audit/audit.service.js';
 import { AuditConsumer } from '../modules/audit/audit.consumer.js';
-import { AuditCleanupService } from '../modules/audit/audit-cleanup.service.js';
 import { WORKER_AUDIT_CONFIG, WORKER_AUDIT_DATABASE } from './worker-audit.tokens.js';
 
 /**
@@ -37,7 +36,6 @@ export class WorkerAuditModule {
       AuditRepository,
       AuditService,
       AuditConsumer,
-      AuditCleanupService,
     ];
 
     return {
@@ -48,7 +46,6 @@ export class WorkerAuditModule {
         AuditRepository,
         AuditService,
         AuditConsumer,
-        AuditCleanupService,
         WORKER_AUDIT_CONFIG,
         WORKER_AUDIT_DATABASE,
       ],

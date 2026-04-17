@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { ConsumerModule } from './consumer.module.js';
 import { ConsumerRegistry } from './consumer.registry.js';
-import { ConsumerCleanupService } from './consumer-cleanup.service.js';
 import { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
 import { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
 import { CONSUMER_DATABASE, CONSUMER_OPTIONS } from './consumer.tokens.js';
@@ -57,20 +56,18 @@ describe('ConsumerModule.register', () => {
     expect(useFactory(dummyDb)).toBe(dummyDb);
   });
 
-  it('includes the registry, repositories, and cleanup service in providers', () => {
+  it('includes the registry and repositories in providers', () => {
     const mod = ConsumerModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
     expect(mod.providers).toContain(ConsumerRegistry);
     expect(mod.providers).toContain(ConsumerReceiptsRepository);
     expect(mod.providers).toContain(ConsumerOffsetsRepository);
-    expect(mod.providers).toContain(ConsumerCleanupService);
   });
 
-  it('exports the repositories, the registry, and the cleanup service', () => {
+  it('exports the repositories and the registry', () => {
     const mod = ConsumerModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
     expect(mod.exports).toContain(ConsumerRegistry);
     expect(mod.exports).toContain(ConsumerReceiptsRepository);
     expect(mod.exports).toContain(ConsumerOffsetsRepository);
-    expect(mod.exports).toContain(ConsumerCleanupService);
   });
 
   it('applies the default receiptRetentionDays of 7 when not overridden', () => {

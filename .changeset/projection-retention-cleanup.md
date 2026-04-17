@@ -5,57 +5,37 @@
 "@ikary/worker-consumer": minor
 ---
 
-Add daily retention cleanup to every table this repo writes unbounded rows
-into. Each job is a thin `@Cron`-scheduled service with a single
-`retentionDays` knob on the owning module's config.
+Expose **retention primitives** on every table this repo writes unbounded
+rows into. Each lib declares its retention intent + a DB delete method;
+this repo does not schedule or run any sweep.
 
-## Defaults
+Scheduling is a separate concern — a dedicated `ikary-scheduler` app
+(outside this repo, post-`ikary-worker-0.1.0`) will consume these specs
+and orchestrate deletes safely across multi-pod deployments. Running
+`@Cron` inside a worker app would fire N simultaneous sweeps (one per
+pod), which is the class of problem a leader-elected scheduler solves.
 
-| Package | Table | Default window | Column |
-| ------- | ----- | -------------- | ------ |
-| `@ikary/worker-audit`         | `ikary_audit_entries`           | **2555 days (~7 years)** | `occurred_at` |
-| `@ikary/worker-analytics`     | `ikary_analytics_buckets_hourly` | **90 days**             | `bucket_start` |
-| `@ikary/worker-activity-feed` | `ikary_activity_entries`        | **30 days**             | `occurred_at` |
-| `@ikary/worker-consumer`      | `ikary_event_consumer_receipts` | **7 days**              | `received_at` |
+## Spec per lib
 
-Schedules are staggered (03:10 → 03:20 → 03:30 → 04:00 UTC) so the jobs
-don't all hit the database in the same instant.
+| Package | Repo method | Default retention | Filter column |
+| ------- | ----------- | ----------------- | ------------- |
+| `@ikary/worker-audit`         | `AuditRepository.deleteOlderThan(Date)`            | `retentionDays: 2555` (~7y) | `occurred_at` |
+| `@ikary/worker-analytics`     | `AnalyticsRepository.deleteOlderThan(Date)`        | `retentionDays: 90`          | `bucket_start` |
+| `@ikary/worker-activity-feed` | `ActivityFeedRepository.deleteOlderThan(Date)`     | `retentionDays: 30`          | `occurred_at` |
+| `@ikary/worker-consumer`      | `ConsumerReceiptsRepository.deleteOlderThan(Date)` | `receiptRetentionDays: 7`    | `received_at` |
 
-## Configuration
+`retentionDays` / `receiptRetentionDays` accept `number | null`. `null`
+signals "externally managed" — the scheduler skips this lib's sweep.
 
-Each projection module accepts an explicit override:
+`ikary_event_consumer_offsets` is intentionally excluded from the spec:
+deleting a per-aggregate offset row would break gap detection if the
+aggregate reactivates.
 
-```ts
-WorkerAuditModule.register({
-  databaseProviderToken: DatabaseService,
-  retentionDays: 365,      // or `null` to disable cleanup
-})
-```
+## What this repo does NOT do
 
-The consumer framework exposes the same knob under `ConsumerModule.register`
-options as `receiptRetentionDays` (named specifically to signal it only
-applies to the receipts table — not the offsets table, which is
-deliberately not cleaned up because it would break gap detection).
+- No `@Cron` decorator anywhere.
+- No `@nestjs/schedule` peer dep on any of these libs.
+- No cleanup service classes.
 
-Passing `null` disables cleanup for that lib: the `@Cron` still registers
-but every run exits immediately, keeping the set of scheduled jobs
-auditable regardless of environment.
-
-## Design notes
-
-- Filtering uses `occurred_at` / `bucket_start` / `received_at` (event
-  time, bucket time, receipt write time) — never `recorded_at`
-  (projection write time). This prevents a backfill worker that catches
-  up after downtime from silently deleting the rows it just wrote.
-- The `ikary_event_consumer_offsets` table is intentionally NOT cleaned
-  up. Deleting a dormant aggregate's last-version row would break gap
-  detection when the aggregate reactivates.
-- `retentionDays` must be a positive integer; `null` disables. `0` and
-  negatives are rejected at the Zod boundary.
-- Cleanup failures log and return 0 — they do not crash the pod. The
-  next cron fire tries again.
-
-## Dependencies
-
-Each affected lib now lists `@nestjs/schedule` as a peer dependency
-(the worker app already declared it at `^4.0.0`).
+The spec sits in the config schema (intent) + the repository (primitive).
+The scheduler app reads both and owns the "when".

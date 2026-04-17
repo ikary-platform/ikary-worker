@@ -3,7 +3,6 @@ import { WorkerActivityFeedModule } from './worker-activity-feed.module.js';
 import { ActivityFeedRepository } from './repositories/activity-feed.repository.js';
 import { ActivityFeedService } from '../modules/activity-feed/activity-feed.service.js';
 import { ActivityFeedConsumer } from '../modules/activity-feed/activity-feed.consumer.js';
-import { ActivityFeedCleanupService } from '../modules/activity-feed/activity-feed-cleanup.service.js';
 import {
   WORKER_ACTIVITY_FEED_CONFIG,
   WORKER_ACTIVITY_FEED_DATABASE,
@@ -36,16 +35,14 @@ describe('WorkerActivityFeedModule.register', () => {
     expect(provider.useFactory(instance)).toBe(instance);
   });
 
-  it('registers and exports the repository, service, consumer, and cleanup service', () => {
+  it('registers and exports the repository, service, and consumer', () => {
     const mod = WorkerActivityFeedModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
     expect(mod.providers).toContain(ActivityFeedRepository);
     expect(mod.providers).toContain(ActivityFeedService);
     expect(mod.providers).toContain(ActivityFeedConsumer);
-    expect(mod.providers).toContain(ActivityFeedCleanupService);
     expect(mod.exports).toContain(ActivityFeedRepository);
     expect(mod.exports).toContain(ActivityFeedService);
     expect(mod.exports).toContain(ActivityFeedConsumer);
-    expect(mod.exports).toContain(ActivityFeedCleanupService);
   });
 
   it('is registered as a global module so ConsumerModule can inject ActivityFeedService', () => {

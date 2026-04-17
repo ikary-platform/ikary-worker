@@ -19,16 +19,23 @@ export const workerAnalyticsConfigSchema = z.object({
   databaseProviderToken: providerTokenSchema,
 
   /**
-   * Hourly buckets whose `bucket_start` is older than this many days are
-   * deleted by a daily cleanup job at 03:20 server time. Defaults to 90
-   * days — dashboards typically look back a quarter, and older buckets
-   * either get rolled up into coarser-grained tables or become
-   * statistical noise.
+   * Declared retention intent, in days — the spec an external scheduler
+   * reads to decide what to delete. **This module does not schedule or
+   * perform cleanup**; it only exposes `AnalyticsRepository.deleteOlderThan`
+   * as the DB primitive and this value as the policy.
    *
-   * Pass `null` to disable cleanup entirely — the cron still registers
-   * but every run exits immediately. Useful for tests, short-lived
-   * environments, or when an external job (e.g. a table partition
-   * pruner) owns retention.
+   * Scheduling lives in a separate `ikary-scheduler` app so that
+   * multi-pod deployments don't fire N simultaneous sweeps.
+   *
+   * Defaults to 90 days — dashboards typically look back a quarter;
+   * older buckets either get rolled up or become statistical noise.
+   *
+   * Pass `null` to mark retention as "disabled / externally managed".
+   *
+   * Scheduler-level note: filter on `bucket_start` (the hour being
+   * tracked), not `updated_at` (the last time a bucket was incremented),
+   * so a long-running event hitting an old bucket doesn't reset its
+   * retention clock.
    */
   retentionDays: z.number().int().positive().nullable().default(90),
 });

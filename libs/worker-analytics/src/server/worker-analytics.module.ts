@@ -7,7 +7,6 @@ import {
 import { AnalyticsRepository } from './repositories/analytics.repository.js';
 import { AnalyticsService } from '../modules/analytics/analytics.service.js';
 import { AnalyticsConsumer } from '../modules/analytics/analytics.consumer.js';
-import { AnalyticsCleanupService } from '../modules/analytics/analytics-cleanup.service.js';
 import { WORKER_ANALYTICS_CONFIG, WORKER_ANALYTICS_DATABASE } from './worker-analytics.tokens.js';
 
 /**
@@ -32,7 +31,6 @@ export class WorkerAnalyticsModule {
       AnalyticsRepository,
       AnalyticsService,
       AnalyticsConsumer,
-      AnalyticsCleanupService,
     ];
 
     return {
@@ -43,7 +41,6 @@ export class WorkerAnalyticsModule {
         AnalyticsRepository,
         AnalyticsService,
         AnalyticsConsumer,
-        AnalyticsCleanupService,
         WORKER_ANALYTICS_CONFIG,
         WORKER_ANALYTICS_DATABASE,
       ],

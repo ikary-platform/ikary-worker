@@ -18,18 +18,22 @@ export const workerActivityFeedConfigSchema = z.object({
   databaseProviderToken: providerTokenSchema,
 
   /**
-   * Activity rows whose `occurred_at` is older than this many days are
-   * deleted by a daily cleanup job at 03:30 server time. Defaults to
-   * 30 days — the feed is a "recent activity" view; older items aren't
-   * useful for the user-facing timeline.
+   * Declared retention intent, in days — the spec an external scheduler
+   * reads to decide what to delete. **This module does not schedule or
+   * perform cleanup**; it only exposes `ActivityFeedRepository.deleteOlderThan`
+   * as the DB primitive and this value as the policy.
    *
-   * Pass `null` to disable cleanup entirely — the cron still registers
-   * but every run exits immediately. Useful for tests, short-lived
-   * environments, or when an external job (e.g. a table partition
-   * pruner) owns retention.
+   * Scheduling lives in a separate `ikary-scheduler` app so that
+   * multi-pod deployments don't fire N simultaneous sweeps.
    *
-   * Filtering uses `occurred_at` so that events backfilled by a catch-up
-   * worker after downtime are not deleted before they have been shown.
+   * Defaults to 30 days — the feed is a "recent activity" view; older
+   * items aren't useful for the user-facing timeline.
+   *
+   * Pass `null` to mark retention as "disabled / externally managed".
+   *
+   * Scheduler-level note: filter on `occurred_at` (event time) so
+   * backfilled rows from a catch-up worker aren't deleted before they
+   * have been shown.
    */
   retentionDays: z.number().int().positive().nullable().default(30),
 });

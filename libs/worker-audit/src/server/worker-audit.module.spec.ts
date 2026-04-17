@@ -3,7 +3,6 @@ import { WorkerAuditModule } from './worker-audit.module.js';
 import { AuditRepository } from './repositories/audit.repository.js';
 import { AuditService } from '../modules/audit/audit.service.js';
 import { AuditConsumer } from '../modules/audit/audit.consumer.js';
-import { AuditCleanupService } from '../modules/audit/audit-cleanup.service.js';
 import { WORKER_AUDIT_CONFIG, WORKER_AUDIT_DATABASE } from './worker-audit.tokens.js';
 
 const FAKE_DB_TOKEN = Symbol('FAKE_DB');
@@ -44,20 +43,18 @@ describe('WorkerAuditModule.register', () => {
     expect(useFactory(dummyDb)).toBe(dummyDb);
   });
 
-  it('registers the repository, service, consumer, and cleanup service as providers', () => {
+  it('registers the repository, service, and consumer as providers', () => {
     const mod = WorkerAuditModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
     expect(mod.providers).toContain(AuditRepository);
     expect(mod.providers).toContain(AuditService);
     expect(mod.providers).toContain(AuditConsumer);
-    expect(mod.providers).toContain(AuditCleanupService);
   });
 
-  it('exports the repository, service, consumer, and cleanup service for wiring into the app', () => {
+  it('exports the repository, service, and consumer for wiring into the app', () => {
     const mod = WorkerAuditModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
     expect(mod.exports).toContain(AuditRepository);
     expect(mod.exports).toContain(AuditService);
     expect(mod.exports).toContain(AuditConsumer);
-    expect(mod.exports).toContain(AuditCleanupService);
   });
 
   it('applies the default retention of 2555 days when retentionDays is omitted', () => {

@@ -3,7 +3,6 @@ import { WorkerAnalyticsModule } from './worker-analytics.module.js';
 import { AnalyticsRepository } from './repositories/analytics.repository.js';
 import { AnalyticsService } from '../modules/analytics/analytics.service.js';
 import { AnalyticsConsumer } from '../modules/analytics/analytics.consumer.js';
-import { AnalyticsCleanupService } from '../modules/analytics/analytics-cleanup.service.js';
 import { WORKER_ANALYTICS_CONFIG, WORKER_ANALYTICS_DATABASE } from './worker-analytics.tokens.js';
 
 const FAKE_DB_TOKEN = Symbol('FAKE_DB');
@@ -35,16 +34,14 @@ describe('WorkerAnalyticsModule.register', () => {
     expect(provider.useFactory(instance)).toBe(instance);
   });
 
-  it('registers and exports the repository, service, consumer, and cleanup service', () => {
+  it('registers and exports the repository, service, and consumer', () => {
     const mod = WorkerAnalyticsModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
     expect(mod.providers).toContain(AnalyticsRepository);
     expect(mod.providers).toContain(AnalyticsService);
     expect(mod.providers).toContain(AnalyticsConsumer);
-    expect(mod.providers).toContain(AnalyticsCleanupService);
     expect(mod.exports).toContain(AnalyticsRepository);
     expect(mod.exports).toContain(AnalyticsService);
     expect(mod.exports).toContain(AnalyticsConsumer);
-    expect(mod.exports).toContain(AnalyticsCleanupService);
   });
 
   it('is registered as a global module so ConsumerModule can inject AnalyticsService', () => {

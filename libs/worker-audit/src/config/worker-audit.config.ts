@@ -22,22 +22,27 @@ export const workerAuditConfigSchema = z.object({
   databaseProviderToken: providerTokenSchema,
 
   /**
-   * Rows whose `occurred_at` is older than this many days are deleted by a
-   * daily cleanup job that runs at 03:10 server time. Defaults to 2555
-   * (~7 years) to cover the retention windows most audit/compliance
-   * regimes (SOX, HIPAA, PCI DSS, GDPR accountability) treat as the safe
-   * floor. Callers with a specific regulatory requirement should set this
-   * explicitly.
+   * Declared retention intent, in days — the spec an external scheduler
+   * reads to decide what to delete. **This module does not schedule or
+   * perform cleanup**; it only exposes `AuditRepository.deleteOlderThan`
+   * as the DB primitive and this value as the policy.
    *
-   * Pass `null` to disable cleanup entirely — the cron still registers but
-   * every run exits immediately. Useful for tests, short-lived
-   * environments, or when an external job (e.g. a table partition pruner)
-   * owns retention.
+   * Scheduling lives in a separate `ikary-scheduler` app so that
+   * multi-pod deployments don't fire N simultaneous sweeps (one per
+   * worker pod).
    *
-   * Filtering uses `occurred_at` (event time) rather than `recorded_at`
-   * (projection write time) so that events backfilled by a catch-up
-   * worker after downtime are not deleted before a human would
-   * reasonably expect them to be.
+   * Defaults to 2555 (~7 years) to cover the retention windows most
+   * audit/compliance regimes (SOX, HIPAA, PCI DSS, GDPR accountability)
+   * treat as the safe floor. Callers with a specific regulatory
+   * requirement should set this explicitly.
+   *
+   * Pass `null` to mark retention as "disabled / externally managed" —
+   * the scheduler will skip this lib's sweep.
+   *
+   * Scheduler-level note: filter on `occurred_at` (event time), not
+   * `recorded_at` (projection write time), so backfilled rows from a
+   * catch-up worker aren't deleted before a human would reasonably
+   * expect them to be.
    */
   retentionDays: z.number().int().positive().nullable().default(2555),
 });

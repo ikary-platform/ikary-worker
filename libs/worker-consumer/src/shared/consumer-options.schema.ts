@@ -34,23 +34,31 @@ export const consumerOptionsSchema = z.object({
   dlx: z.string().default('cell.events.dlx'),
 
   /**
-   * Receipts (in `ikary_event_consumer_receipts`) older than this many
-   * days are deleted by a daily cleanup job at 04:00 server time.
-   * Defaults to 7 days.
+   * Declared retention intent for `ikary_event_consumer_receipts`, in
+   * days — the spec an external scheduler reads. **This module does
+   * not schedule or perform cleanup**; it only exposes
+   * `ConsumerReceiptsRepository.deleteOlderThan` as the DB primitive
+   * and this value as the policy.
    *
-   * This window MUST exceed the longest interval over which the broker
-   * could redeliver a message (typical RabbitMQ deployments: DLX
-   * republish-to-self bounded by `maxRetries` above, plus queue
-   * residency). 7 days is conservative for a `maxRetries: 5` default —
-   * override if you deploy a DLX with its own long retention window.
+   * Scheduling lives in a separate `ikary-scheduler` app so that
+   * multi-pod worker deployments don't fire N simultaneous sweeps.
    *
-   * Pass `null` to disable cleanup entirely. Useful for tests,
-   * short-lived environments, or when an external job (e.g. a table
-   * partition pruner) owns receipt retention.
+   * Defaults to 7 days — conservative for the default `maxRetries: 5`.
+   *
+   * Scheduler-level note: this window MUST exceed the longest interval
+   * over which the broker could redeliver a message (typical RabbitMQ
+   * setups: DLX republish-to-self bounded by `maxRetries`, plus queue
+   * residency). Deleting a receipt that still references a redeliverable
+   * message would let it slip past idempotency and re-run the handler's
+   * side effects. Override upward if your DLX has long retention or you
+   * replay from archive.
+   *
+   * Pass `null` to mark retention as "disabled / externally managed".
    *
    * The offsets table (`ikary_event_consumer_offsets`) is intentionally
-   * NOT cleaned up: deleting a per-aggregate offset would break gap
-   * detection if the aggregate ever becomes active again.
+   * NOT included in the retention spec: deleting a per-aggregate offset
+   * would break gap detection if the aggregate ever becomes active
+   * again.
    */
   receiptRetentionDays: z.number().int().positive().nullable().default(7),
 });

@@ -11,7 +11,6 @@ import {
 import { ConsumerReceiptsRepository } from './consumer-receipts.repository.js';
 import { ConsumerOffsetsRepository } from './consumer-offsets.repository.js';
 import { ConsumerRegistry } from './consumer.registry.js';
-import { ConsumerCleanupService } from './consumer-cleanup.service.js';
 
 export interface RegisterConsumerModuleOptions {
   /**
@@ -59,7 +58,6 @@ export class ConsumerModule {
       ConsumerReceiptsRepository,
       ConsumerOffsetsRepository,
       ConsumerRegistry,
-      ConsumerCleanupService,
       ...(input.consumers ?? []),
     ];
 
@@ -72,7 +70,6 @@ export class ConsumerModule {
         ConsumerReceiptsRepository,
         ConsumerOffsetsRepository,
         ConsumerRegistry,
-        ConsumerCleanupService,
       ],
     };
   }
