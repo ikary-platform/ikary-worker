@@ -1,0 +1,14 @@
+{
+  "event_id": "evt-smoke-003",
+  "event_name": "invoice.failed",
+  "version": 1,
+  "timestamp": "2026-04-17T10:00:00.000Z",
+  "tenant_id": "t-smoke",
+  "workspace_id": "ws-smoke",
+  "cell_id": "c-smoke",
+  "actor": { "type": "system", "id": "system" },
+  "entity": { "type": "invoice", "id": "inv-smoke-003" },
+  "data": { "reason": "payment_declined" },
+  "previous": {},
+  "metadata": {}
+}

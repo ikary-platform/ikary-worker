@@ -1,0 +1,17 @@
+# Smoke-test overlay — overrides the project name and removes host port
+# mappings so the suite can run alongside a local dev environment without
+# port conflicts. All interactions go through `docker compose exec`.
+name: ikary-smoke
+
+services:
+  postgres:
+    ports: !reset []
+
+  rabbitmq:
+    ports: !reset []
+
+  worker:
+    ports: !reset []
+
+  scheduler:
+    ports: !reset []

@@ -1,0 +1,64 @@
+# Build context is the parent directory (../) containing both repos.
+# Paths are relative to that context root.
+
+**/.git
+**/.github
+**/.turbo
+**/.changeset
+**/.claude
+**/node_modules
+**/dist
+**/coverage
+**/.DS_Store
+**/.env
+**/.env.*
+
+# Manifest dirs not needed by ikary-worker
+ikary-manifest/evals
+ikary-manifest/manifests
+ikary-manifest/apps/cell-playground
+ikary-manifest/apps/cell-playground-legacy
+ikary-manifest/apps/cell-preview-server
+ikary-manifest/apps/cell-runtime-api
+ikary-manifest/apps/docs
+ikary-manifest/apps/ikary
+ikary-manifest/apps/local-stack-e2e
+ikary-manifest/apps/mcp-server
+ikary-manifest/apps/mcp-server-e2e
+ikary-manifest/apps/playground-app
+ikary-manifest/apps/preview-server
+ikary-manifest/apps/try-api
+ikary-manifest/apps/try-demo
+
+# Manifest libs not needed by ikary-worker
+ikary-manifest/libs/cell-ai
+ikary-manifest/libs/cell-branding
+ikary-manifest/libs/cell-data
+ikary-manifest/libs/cell-migration-core
+ikary-manifest/libs/cell-presentation
+ikary-manifest/libs/cell-primitives
+ikary-manifest/libs/cell-renderer
+ikary-manifest/libs/contract
+ikary-manifest/libs/data
+ikary-manifest/libs/engine
+ikary-manifest/libs/loader
+ikary-manifest/libs/presentation
+ikary-manifest/libs/primitive-contract
+ikary-manifest/libs/primitive-studio
+ikary-manifest/libs/primitives
+ikary-manifest/libs/renderer
+ikary-manifest/libs/system-ai
+ikary-manifest/libs/system-auth
+ikary-manifest/libs/system-authorization
+ikary-manifest/libs/system-ikary-ui
+ikary-manifest/libs/system-prompt
+
+# Test and doc files (keep migrations)
+ikary-worker/docs
+ikary-worker/tests
+**/*.spec.ts
+**/*.test.ts
+**/CLAUDE.md
+**/README.md
+**/LIBRARY_STYLE_RULES.md
+**/LIBRARY_TEMPLATE.md
