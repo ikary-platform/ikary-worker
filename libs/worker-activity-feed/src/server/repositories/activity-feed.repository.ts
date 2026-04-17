@@ -40,4 +40,16 @@ export class ActivityFeedRepository {
       .onConflict((oc) => oc.column('event_id').doNothing())
       .execute();
   }
+
+  /**
+   * Delete every activity row whose `occurred_at` is strictly older than
+   * `olderThan`. Returns the number of rows deleted.
+   */
+  async deleteOlderThan(olderThan: Date): Promise<number> {
+    const result = await this.dbService.db
+      .deleteFrom('ikary_activity_entries')
+      .where('occurred_at', '<', olderThan)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0);
+  }
 }

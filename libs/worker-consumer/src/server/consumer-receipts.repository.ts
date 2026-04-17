@@ -40,4 +40,23 @@ export class ConsumerReceiptsRepository {
       })
       .execute();
   }
+
+  /**
+   * Delete receipts whose `received_at` is strictly older than
+   * `olderThan`. Returns the number of rows deleted. Uses the dedicated
+   * `ikary_event_consumer_receipts_received_at_idx` index on this column
+   * so the sweep avoids a full table scan.
+   *
+   * `olderThan` MUST be earlier than the broker's longest possible
+   * redelivery/replay window. Deleting a receipt that still references a
+   * redeliverable message would let that message slip through idempotency
+   * and re-run the handler's side effects.
+   */
+  async deleteOlderThan(olderThan: Date): Promise<number> {
+    const result = await this.dbService.db
+      .deleteFrom('ikary_event_consumer_receipts')
+      .where('received_at', '<', olderThan)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0);
+  }
 }

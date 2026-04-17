@@ -16,4 +16,5 @@ export type {
 export {
   workerActivityFeedConfigSchema,
   type WorkerActivityFeedConfig,
+  type WorkerActivityFeedConfigInput,
 } from '../config/worker-activity-feed.config.js';

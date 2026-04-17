@@ -70,6 +70,31 @@ describe('ConsumerModule.register', () => {
     expect(mod.exports).toContain(ConsumerOffsetsRepository);
   });
 
+  it('applies the default receiptRetentionDays of 7 when not overridden', () => {
+    const mod = ConsumerModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
+    const optionsProvider = (mod.providers ?? []).find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === CONSUMER_OPTIONS,
+    );
+    const { useValue } = optionsProvider as {
+      useValue: { receiptRetentionDays: number | null };
+    };
+    expect(useValue.receiptRetentionDays).toBe(7);
+  });
+
+  it('accepts receiptRetentionDays: null to disable cleanup', () => {
+    const mod = ConsumerModule.register({
+      databaseProviderToken: FAKE_DB_TOKEN,
+      options: { receiptRetentionDays: null },
+    });
+    const optionsProvider = (mod.providers ?? []).find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === CONSUMER_OPTIONS,
+    );
+    const { useValue } = optionsProvider as {
+      useValue: { receiptRetentionDays: number | null };
+    };
+    expect(useValue.receiptRetentionDays).toBeNull();
+  });
+
   it('merges user-supplied consumers into the provider list', () => {
     class FakeConsumer {}
     const consumerProvider = { provide: 'X', useClass: FakeConsumer, multi: true as const };

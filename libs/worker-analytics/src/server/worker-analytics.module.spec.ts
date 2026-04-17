@@ -48,4 +48,23 @@ describe('WorkerAnalyticsModule.register', () => {
     const mod = WorkerAnalyticsModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
     expect(mod.global).toBe(true);
   });
+
+  it('applies the default retention of 90 days when retentionDays is omitted', () => {
+    const mod = WorkerAnalyticsModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
+    const cfg = (mod.providers ?? []).find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === WORKER_ANALYTICS_CONFIG,
+    );
+    expect((cfg as { useValue: { retentionDays: number } }).useValue.retentionDays).toBe(90);
+  });
+
+  it('accepts retentionDays: null to disable cleanup', () => {
+    const mod = WorkerAnalyticsModule.register({
+      databaseProviderToken: FAKE_DB_TOKEN,
+      retentionDays: null,
+    });
+    const cfg = (mod.providers ?? []).find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === WORKER_ANALYTICS_CONFIG,
+    );
+    expect((cfg as { useValue: { retentionDays: number | null } }).useValue.retentionDays).toBeNull();
+  });
 });

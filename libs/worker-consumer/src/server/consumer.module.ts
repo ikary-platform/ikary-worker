@@ -2,6 +2,7 @@ import { Module, type DynamicModule, type Provider } from '@nestjs/common';
 import {
   consumerOptionsSchema,
   type ConsumerOptions,
+  type ConsumerOptionsInput,
 } from '../shared/consumer-options.schema.js';
 import {
   CONSUMER_DATABASE,
@@ -29,7 +30,7 @@ export interface RegisterConsumerModuleOptions {
   consumers?: Provider[];
 
   /** Optional overrides merged with the defaults in consumerOptionsSchema. */
-  options?: Partial<ConsumerOptions>;
+  options?: ConsumerOptionsInput;
 }
 
 /**

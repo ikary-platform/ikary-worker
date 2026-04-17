@@ -65,4 +65,21 @@ export class AnalyticsRepository {
       )
       .execute();
   }
+
+  /**
+   * Delete every analytics bucket whose `bucket_start` is strictly older
+   * than `olderThan`. Returns the number of rows deleted.
+   *
+   * Filtering uses `bucket_start` (the hour being tracked) rather than
+   * `updated_at` (the last time the bucket was incremented) because a
+   * long-running aggregate event should not reset the retention clock on
+   * an old bucket.
+   */
+  async deleteOlderThan(olderThan: Date): Promise<number> {
+    const result = await this.dbService.db
+      .deleteFrom('ikary_analytics_buckets_hourly')
+      .where('bucket_start', '<', olderThan)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0);
+  }
 }

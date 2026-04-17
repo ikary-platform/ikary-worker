@@ -57,6 +57,39 @@ describe('WorkerAuditModule.register', () => {
     expect(mod.exports).toContain(AuditConsumer);
   });
 
+  it('applies the default retention of 2555 days when retentionDays is omitted', () => {
+    const mod = WorkerAuditModule.register({ databaseProviderToken: FAKE_DB_TOKEN });
+    const configProvider = (mod.providers ?? []).find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === WORKER_AUDIT_CONFIG,
+    );
+    const { useValue } = configProvider as { useValue: { retentionDays: number } };
+    expect(useValue.retentionDays).toBe(2555);
+  });
+
+  it('accepts an explicit retentionDays override', () => {
+    const mod = WorkerAuditModule.register({
+      databaseProviderToken: FAKE_DB_TOKEN,
+      retentionDays: 30,
+    });
+    const configProvider = (mod.providers ?? []).find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === WORKER_AUDIT_CONFIG,
+    );
+    const { useValue } = configProvider as { useValue: { retentionDays: number } };
+    expect(useValue.retentionDays).toBe(30);
+  });
+
+  it('accepts retentionDays: null to disable cleanup', () => {
+    const mod = WorkerAuditModule.register({
+      databaseProviderToken: FAKE_DB_TOKEN,
+      retentionDays: null,
+    });
+    const configProvider = (mod.providers ?? []).find(
+      (p) => typeof p === 'object' && 'provide' in p && p.provide === WORKER_AUDIT_CONFIG,
+    );
+    const { useValue } = configProvider as { useValue: { retentionDays: number | null } };
+    expect(useValue.retentionDays).toBeNull();
+  });
+
   it('is registered as a global module so ConsumerModule can inject AuditService', () => {
     // ConsumerModule instantiates AuditConsumer via its CONSUMER multi-provider
     // token, which means the consumer's constructor dependencies (including

@@ -13,4 +13,5 @@ export type {
 export {
   workerAnalyticsConfigSchema,
   type WorkerAnalyticsConfig,
+  type WorkerAnalyticsConfigInput,
 } from '../config/worker-analytics.config.js';

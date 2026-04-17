@@ -12,13 +12,23 @@ function makeQueryBuilder(returnValue: unknown) {
   return qb;
 }
 
+function makeDeleteQueryBuilder(numDeletedRows: number | bigint = 0) {
+  const qb: Record<string, ReturnType<typeof vi.fn>> = {};
+  qb['where']            = vi.fn().mockReturnValue(qb);
+  qb['executeTakeFirst'] = vi.fn().mockResolvedValue({ numDeletedRows });
+  return qb;
+}
+
 function makeDbService(returnValue: unknown) {
   const qb = makeQueryBuilder(returnValue);
+  const deleteQb = makeDeleteQueryBuilder(0);
   return {
     qb,
+    deleteQb,
     db: {
       selectFrom: vi.fn().mockReturnValue(qb),
       insertInto: vi.fn().mockReturnValue(qb),
+      deleteFrom: vi.fn().mockReturnValue(deleteQb),
     },
   };
 }
@@ -63,5 +73,36 @@ describe('ConsumerReceiptsRepository', () => {
     await repo.insert('audit', 'evt-003', tx as never);
     expect(tx.insertInto).toHaveBeenCalledWith('ikary_event_consumer_receipts');
     expect(db.db.insertInto).not.toHaveBeenCalled();
+  });
+
+  describe('deleteOlderThan', () => {
+    it('filters by received_at < ISO cutoff and returns the count', async () => {
+      db = makeDbService(undefined);
+      repo = new ConsumerReceiptsRepository(db as never);
+      db.deleteQb.executeTakeFirst.mockResolvedValue({ numDeletedRows: 99 });
+      const cutoff = new Date('2026-04-09T00:00:00.000Z');
+
+      const deleted = await repo.deleteOlderThan(cutoff);
+
+      expect(db.db.deleteFrom).toHaveBeenCalledWith('ikary_event_consumer_receipts');
+      expect(db.deleteQb.where).toHaveBeenCalledWith('received_at', '<', cutoff);
+      expect(deleted).toBe(99);
+    });
+
+    it('coerces a bigint numDeletedRows to number', async () => {
+      db = makeDbService(undefined);
+      repo = new ConsumerReceiptsRepository(db as never);
+      db.deleteQb.executeTakeFirst.mockResolvedValue({ numDeletedRows: 10000n });
+      const deleted = await repo.deleteOlderThan(new Date());
+      expect(deleted).toBe(10000);
+    });
+
+    it('returns 0 when numDeletedRows is missing', async () => {
+      db = makeDbService(undefined);
+      repo = new ConsumerReceiptsRepository(db as never);
+      db.deleteQb.executeTakeFirst.mockResolvedValue({});
+      const deleted = await repo.deleteOlderThan(new Date());
+      expect(deleted).toBe(0);
+    });
   });
 });

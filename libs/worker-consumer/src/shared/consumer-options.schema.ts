@@ -32,6 +32,36 @@ export const consumerOptionsSchema = z.object({
    * `cell.events.dlx`).
    */
   dlx: z.string().default('cell.events.dlx'),
+
+  /**
+   * Declared retention intent for `ikary_event_consumer_receipts`, in
+   * days — the spec an external scheduler reads. **This module does
+   * not schedule or perform cleanup**; it only exposes
+   * `ConsumerReceiptsRepository.deleteOlderThan` as the DB primitive
+   * and this value as the policy.
+   *
+   * Scheduling lives in a separate `ikary-scheduler` app so that
+   * multi-pod worker deployments don't fire N simultaneous sweeps.
+   *
+   * Defaults to 7 days — conservative for the default `maxRetries: 5`.
+   *
+   * Scheduler-level note: this window MUST exceed the longest interval
+   * over which the broker could redeliver a message (typical RabbitMQ
+   * setups: DLX republish-to-self bounded by `maxRetries`, plus queue
+   * residency). Deleting a receipt that still references a redeliverable
+   * message would let it slip past idempotency and re-run the handler's
+   * side effects. Override upward if your DLX has long retention or you
+   * replay from archive.
+   *
+   * Pass `null` to mark retention as "disabled / externally managed".
+   *
+   * The offsets table (`ikary_event_consumer_offsets`) is intentionally
+   * NOT included in the retention spec: deleting a per-aggregate offset
+   * would break gap detection if the aggregate ever becomes active
+   * again.
+   */
+  receiptRetentionDays: z.number().int().positive().nullable().default(7),
 });
 
 export type ConsumerOptions = z.infer<typeof consumerOptionsSchema>;
+export type ConsumerOptionsInput = z.input<typeof consumerOptionsSchema>;

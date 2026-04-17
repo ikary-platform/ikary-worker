@@ -14,11 +14,23 @@ function makeQueryBuilder() {
   return qb;
 }
 
+function makeDeleteQueryBuilder(numDeletedRows: number | bigint = 0) {
+  const qb: Record<string, ReturnType<typeof vi.fn>> = {};
+  qb['where']            = vi.fn().mockReturnValue(qb);
+  qb['executeTakeFirst'] = vi.fn().mockResolvedValue({ numDeletedRows });
+  return qb;
+}
+
 function makeDbService() {
   const qb = makeQueryBuilder();
+  const deleteQb = makeDeleteQueryBuilder(0);
   return {
     qb,
-    db: { insertInto: vi.fn().mockReturnValue(qb) },
+    deleteQb,
+    db: {
+      insertInto: vi.fn().mockReturnValue(qb),
+      deleteFrom: vi.fn().mockReturnValue(deleteQb),
+    },
   };
 }
 
@@ -107,5 +119,30 @@ describe('AuditRepository', () => {
   it('uses ON CONFLICT DO NOTHING on event_id', async () => {
     await repo.insertIfNotExists(entry);
     expect(db.qb.onConflict).toHaveBeenCalledOnce();
+  });
+
+  describe('deleteOlderThan', () => {
+    it('filters by occurred_at < ISO cutoff and returns the count', async () => {
+      db.deleteQb.executeTakeFirst.mockResolvedValue({ numDeletedRows: 42 });
+      const cutoff = new Date('2020-01-01T00:00:00.000Z');
+
+      const deleted = await repo.deleteOlderThan(cutoff);
+
+      expect(db.db.deleteFrom).toHaveBeenCalledWith('ikary_audit_entries');
+      expect(db.deleteQb.where).toHaveBeenCalledWith('occurred_at', '<', cutoff);
+      expect(deleted).toBe(42);
+    });
+
+    it('tolerates a bigint numDeletedRows from pg and coerces it to number', async () => {
+      db.deleteQb.executeTakeFirst.mockResolvedValue({ numDeletedRows: 9000n });
+      const deleted = await repo.deleteOlderThan(new Date());
+      expect(deleted).toBe(9000);
+    });
+
+    it('returns 0 when Kysely omits numDeletedRows entirely', async () => {
+      db.deleteQb.executeTakeFirst.mockResolvedValue({});
+      const deleted = await repo.deleteOlderThan(new Date());
+      expect(deleted).toBe(0);
+    });
   });
 });

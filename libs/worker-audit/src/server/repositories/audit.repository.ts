@@ -52,4 +52,20 @@ export class AuditRepository {
       .onConflict((oc) => oc.column('event_id').doNothing())
       .execute();
   }
+
+  /**
+   * Delete every audit row whose `occurred_at` is strictly older than
+   * `olderThan`. Returns the number of rows deleted (driven from
+   * `numDeletedRows` in Kysely's ExecuteResult).
+   *
+   * Callers pass a precomputed cutoff rather than a retention window so the
+   * service owns clock semantics and can be tested without mocking `Date`.
+   */
+  async deleteOlderThan(olderThan: Date): Promise<number> {
+    const result = await this.dbService.db
+      .deleteFrom('ikary_audit_entries')
+      .where('occurred_at', '<', olderThan)
+      .executeTakeFirst();
+    return Number(result.numDeletedRows ?? 0);
+  }
 }
