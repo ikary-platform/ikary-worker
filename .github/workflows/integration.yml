@@ -1,0 +1,42 @@
+name: Integration Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout ikary-worker
+        uses: actions/checkout@v4
+        with:
+          path: ikary-worker
+
+      - name: Checkout ikary-manifest (linked packages)
+        uses: actions/checkout@v4
+        with:
+          repository: ikary-platform/ikary-manifest
+          path: ikary-manifest
+
+      - name: Run integration smoke tests
+        working-directory: ikary-worker
+        run: bash tests/integration/smoke-test.sh
+
+      - name: Dump logs on failure
+        if: failure()
+        working-directory: ikary-worker
+        run: >-
+          docker compose
+          -f docker-compose.yml
+          -f tests/integration/docker-compose.smoke.yml
+          --profile apps --profile tools
+          logs --tail 200

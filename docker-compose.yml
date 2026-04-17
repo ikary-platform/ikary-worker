@@ -1,4 +1,4 @@
-version: "3.9"
+name: ikary-worker
 
 services:
   postgres:
@@ -11,6 +11,11 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ikary"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
 
   rabbitmq:
     image: rabbitmq:3-management-alpine
@@ -18,8 +23,88 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
     ports:
-      - "5672:5672"   # AMQP
-      - "15672:15672" # Management UI
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  worker:
+    build:
+      context: ..
+      dockerfile: ikary-worker/Dockerfile
+      args:
+        APP: worker
+    environment:
+      DATABASE_URL: postgres://ikary:ikary@postgres:5432/ikary
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      PORT: "3002"
+      LOG_PRETTY: "false"
+    ports:
+      - "3002:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const h=require('http');h.get('http://localhost:3002/health',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>process.exit(r.statusCode===200?0:1))}).on('error',()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    profiles:
+      - apps
+
+  scheduler:
+    build:
+      context: ..
+      dockerfile: ikary-worker/Dockerfile
+      args:
+        APP: scheduler
+    environment:
+      DATABASE_URL: postgres://ikary:ikary@postgres:5432/ikary
+      RABBITMQ_URL: amqp://guest:guest@rabbitmq:5672
+      PORT: "3003"
+      LOG_PRETTY: "false"
+      RETENTION_AUDIT_DAYS: "2555"
+      RETENTION_ANALYTICS_DAYS: "90"
+      RETENTION_ACTIVITY_FEED_DAYS: "30"
+      RETENTION_CONSUMER_RECEIPTS_DAYS: "7"
+    ports:
+      - "3003:3003"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"const h=require('http');h.get('http://localhost:3003/health',r=>{let d='';r.on('data',c=>d+=c);r.on('end',()=>process.exit(r.statusCode===200?0:1))}).on('error',()=>process.exit(1))\""]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    profiles:
+      - apps
+
+  migrate:
+    build:
+      context: ..
+      dockerfile: ikary-worker/Dockerfile
+      target: worker-build
+      args:
+        APP: worker
+    working_dir: /app/ikary-worker
+    environment:
+      DATABASE_URL: postgres://ikary:ikary@postgres:5432/ikary
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: ["pnpm", "--filter", "@ikary/worker", "migrate"]
+    profiles:
+      - tools
 
 volumes:
   postgres_data:

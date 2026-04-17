@@ -1,0 +1,14 @@
+{
+  "event_id": "evt-smoke-002",
+  "event_name": "invoice.created",
+  "version": 1,
+  "timestamp": "2026-04-17T10:00:00.000Z",
+  "tenant_id": "t-smoke",
+  "workspace_id": "ws-smoke",
+  "cell_id": "c-smoke",
+  "actor": { "type": "user", "id": "actor-smoke" },
+  "entity": { "type": "invoice", "id": "inv-smoke-002" },
+  "data": { "amount": 250, "currency": "EUR" },
+  "previous": {},
+  "metadata": {}
+}

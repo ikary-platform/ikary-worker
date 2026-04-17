@@ -1,0 +1,5 @@
+{
+  "migrate": {
+    "packages": ["@ikary/scheduler"]
+  }
+}
